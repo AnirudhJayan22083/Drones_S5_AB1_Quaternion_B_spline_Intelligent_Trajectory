@@ -1,0 +1,98 @@
+<mujoco model="quadrotor_stage1">
+  <!--
+    Stage 1 starter model: a "+"-configuration quadrotor with 4 direct
+    force/torque motor actuators, plus a couple of static box obstacles
+    for later stages (Stage 3 ray-casting).
+
+    Parameters here MUST match stage1_dynamics_attitude/config.py:
+      mass                = 1.2 kg
+      diag inertia        = 0.02 0.02 0.035  (kg*m^2)
+      arm length           = 0.20 m
+      motor order          = front(+X), right(-Y), back(-X), left(+Y)
+      spin dirs             = +1, -1, +1, -1  (CCW/CW)
+      yaw torque coeff      = 0.02 m   -> gear z-torque = spin * 0.02
+      motor thrust range    = 0 .. 8 N
+  -->
+
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" integrator="RK4" gravity="0 0 -9.81"/>
+
+  <default>
+    <geom contype="1" conaffinity="1" friction="1.0 0.005 0.0001"/>
+    <default class="arm">
+      <geom type="capsule" size="0.012" rgba="0.15 0.15 0.15 1" mass="0"/>
+    </default>
+    <default class="rotor">
+      <geom type="cylinder" size="0.06 0.006" rgba="0.2 0.5 0.9 0.85" mass="0" contype="0" conaffinity="0"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.65 0.75 0.9" rgb2="1 1 1" width="256" height="256"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.2 0.25 0.3" rgb2="0.3 0.35 0.4" width="512" height="512"/>
+    <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.1"/>
+    <material name="obstacle_mat" rgba="0.85 0.25 0.2 0.55"/>
+    <material name="body_mat" rgba="0.25 0.25 0.28 1"/>
+  </asset>
+
+  <worldbody>
+    <light directional="true" diffuse="0.8 0.8 0.8" pos="0 0 5" dir="0 0 -1"/>
+    <geom name="ground" type="plane" size="20 20 0.1" material="grid_mat"/>
+
+    <body name="drone" pos="0 0 1">
+      <freejoint name="drone_free"/>
+      <inertial pos="0 0 0" mass="1.2" diaginertia="0.02 0.02 0.035"/>
+
+      <!-- central body -->
+      <geom name="chassis" type="box" size="0.08 0.08 0.03" material="body_mat" mass="0"/>
+
+      <!-- arms (visual/collision only, mass carried by the <inertial> above) -->
+      <geom class="arm" name="arm_front" fromto="0 0 0  0.20 0 0"/>
+      <geom class="arm" name="arm_right" fromto="0 0 0  0 -0.20 0"/>
+      <geom class="arm" name="arm_back"  fromto="0 0 0 -0.20 0 0"/>
+      <geom class="arm" name="arm_left"  fromto="0 0 0  0 0.20 0"/>
+
+      <!-- motor sites: force+torque actuators attach here -->
+      <site name="site_front" pos="0.20 0 0" size="0.01"/>
+      <site name="site_right" pos="0 -0.20 0" size="0.01"/>
+      <site name="site_back" pos="-0.20 0 0" size="0.01"/>
+      <site name="site_left" pos="0 0.20 0" size="0.01"/>
+
+      <geom class="rotor" name="rotor_front" pos="0.20 0 0.006"/>
+      <geom class="rotor" name="rotor_right" pos="0 -0.20 0.006"/>
+      <geom class="rotor" name="rotor_back" pos="-0.20 0 0.006"/>
+      <geom class="rotor" name="rotor_left" pos="0 0.20 0.006"/>
+
+      <!-- onboard sensors' reference sites -->
+      <site name="imu_site" pos="0 0 0" size="0.005"/>
+    </body>
+
+    <!-- placeholder static obstacles for Stage 3 ray-casting -->
+    <body name="obstacle_1" pos="1.5 0.5 1.0">
+      <geom name="obstacle_1_geom" type="box" size="0.15 0.15 0.5" material="obstacle_mat"/>
+    </body>
+    <body name="obstacle_2" pos="-1.2 -1.0 0.75">
+      <geom name="obstacle_2_geom" type="cylinder" size="0.2 0.75" material="obstacle_mat"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!--
+      Each motor is a direct force/torque actuator on its site: ctrl (N) is
+      thrust along the local +Z axis, gear[5] converts the same ctrl value
+      into the propeller's reaction (drag) torque about local Z.
+      gear = [Fx Fy Fz Tx Ty Tz] per unit ctrl.
+    -->
+    <motor name="motor_front" site="site_front" gear="0 0 1 0 0  0.02" ctrlrange="0 8"/>
+    <motor name="motor_right" site="site_right" gear="0 0 1 0 0 -0.02" ctrlrange="0 8"/>
+    <motor name="motor_back"  site="site_back"  gear="0 0 1 0 0  0.02" ctrlrange="0 8"/>
+    <motor name="motor_left"  site="site_left"  gear="0 0 1 0 0 -0.02" ctrlrange="0 8"/>
+  </actuator>
+
+  <sensor>
+    <framequat name="imu_quat" objtype="site" objname="imu_site"/>
+    <gyro name="imu_gyro" site="imu_site"/>
+    <framepos name="drone_pos" objtype="site" objname="imu_site"/>
+    <framelinvel name="drone_linvel" objtype="site" objname="imu_site"/>
+  </sensor>
+</mujoco>

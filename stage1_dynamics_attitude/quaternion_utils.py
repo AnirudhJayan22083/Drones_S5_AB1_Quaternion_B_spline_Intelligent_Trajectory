@@ -83,6 +83,46 @@ def quat_to_euler_deg(q: np.ndarray) -> np.ndarray:
     return np.degrees([roll, pitch, yaw])
 
 
+def quat_from_rotmat(R: np.ndarray) -> np.ndarray:
+    """
+    Convert a 3x3 rotation matrix (body -> world) to a unit quaternion
+    [w, x, y, z]. Shepperd's method: picks the numerically stable branch
+    based on the largest of {trace, R[0,0], R[1,1], R[2,2]} to avoid
+    dividing by a near-zero term.
+
+    Used by Stage 2's position controller, which builds R from a desired
+    thrust direction (body +Z) and a desired heading (body +X projection)
+    and needs the resulting attitude as q_des for ``AttitudeController``.
+    """
+    trace = R[0, 0] + R[1, 1] + R[2, 2]
+    if trace > 0.0:
+        s = 0.5 / np.sqrt(trace + 1.0)
+        w = 0.25 / s
+        x = (R[2, 1] - R[1, 2]) * s
+        y = (R[0, 2] - R[2, 0]) * s
+        z = (R[1, 0] - R[0, 1]) * s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+        w = (R[2, 1] - R[1, 2]) / s
+        x = 0.25 * s
+        y = (R[0, 1] + R[1, 0]) / s
+        z = (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+        w = (R[0, 2] - R[2, 0]) / s
+        x = (R[0, 1] + R[1, 0]) / s
+        y = 0.25 * s
+        z = (R[1, 2] + R[2, 1]) / s
+    else:
+        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+        w = (R[1, 0] - R[0, 1]) / s
+        x = (R[0, 2] + R[2, 0]) / s
+        y = (R[1, 2] + R[2, 1]) / s
+        z = 0.25 * s
+
+    return quat_normalize(np.array([w, x, y, z]))
+
+
 def quat_to_rotmat(q: np.ndarray) -> np.ndarray:
     """3x3 rotation matrix (body -> world) for q = [w, x, y, z]."""
     w, x, y, z = quat_normalize(q)

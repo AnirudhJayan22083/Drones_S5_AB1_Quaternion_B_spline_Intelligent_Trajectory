@@ -23,6 +23,7 @@ from mujoco import viewer as mujoco_viewer
 from .logger import FlightLogger
 from .pipeline import (
     MODEL_PATH,
+    build_imu_and_estimator,
     build_pipeline,
     draw_planned_scene,
     frame_camera,
@@ -40,6 +41,7 @@ def run(duration: float = None):
     planner, traj, pos_ctrl, attitude_ctrl, mixer, obstacle_distance_fn = build_pipeline(model, data)
     duration = duration if duration is not None else traj.duration
     logger = FlightLogger()
+    imu, estimator = build_imu_and_estimator(model, data)
 
     with mujoco_viewer.launch_passive(model, data) as viewer_ctx:
         draw_planned_scene(viewer_ctx, planner)
@@ -50,8 +52,9 @@ def run(duration: float = None):
             t = data.time
             pos = data.qpos[0:3].copy()
             vel = data.qvel[0:3].copy()
-            q = data.qpos[3:7].copy()
-            omega = data.qvel[3:6].copy()
+
+            accel_meas, gyro_meas = imu.read()
+            q_est = estimator.update(accel_meas, gyro_meas, model.opt.timestep)
 
             if planner.maybe_replan(t, pos):
                 print(f"[t={t:.2f}s] Obstacle detected -- replanned remaining route "
@@ -64,14 +67,14 @@ def run(duration: float = None):
             yaw_des = traj.yaw(t)
 
             thrust_des, q_des = pos_ctrl.compute(pos, vel, pos_des, vel_des, acc_des, yaw_des)
-            torque = attitude_ctrl.compute_torque(q, omega, q_des)
+            torque = attitude_ctrl.compute_torque(q_est, gyro_meas, q_des)
             motor_thrusts = mixer.allocate(thrust_des, torque)
             data.ctrl[:] = motor_thrusts
 
             obstacle_dist = nearest_obstacle_distance(obstacle_distance_fn, pos)
 
             mujoco.mj_step(model, data)
-            logger.record(t, pos, pos_des, q, q_des, omega, motor_thrusts, obstacle_dist)
+            logger.record(t, pos, pos_des, q_est, q_des, gyro_meas, motor_thrusts, obstacle_dist)
 
             viewer_ctx.sync()
             elapsed_wall = time.time() - wall_start

@@ -21,7 +21,14 @@ import mujoco
 from mujoco import viewer as mujoco_viewer
 
 from .logger import FlightLogger
-from .pipeline import MODEL_PATH, build_pipeline, nearest_obstacle_distance, reset_drone_state
+from .pipeline import (
+    MODEL_PATH,
+    build_pipeline,
+    draw_planned_scene,
+    frame_camera,
+    nearest_obstacle_distance,
+    reset_drone_state,
+)
 
 
 def run(duration: float = None):
@@ -35,6 +42,9 @@ def run(duration: float = None):
     logger = FlightLogger()
 
     with mujoco_viewer.launch_passive(model, data) as viewer_ctx:
+        draw_planned_scene(viewer_ctx, planner)
+        frame_camera(viewer_ctx, model, data, planner)
+
         wall_start = time.time()
         while data.time < duration and viewer_ctx.is_running():
             t = data.time
@@ -42,6 +52,11 @@ def run(duration: float = None):
             vel = data.qvel[0:3].copy()
             q = data.qpos[3:7].copy()
             omega = data.qvel[3:6].copy()
+
+            if planner.maybe_replan(t, pos):
+                print(f"[t={t:.2f}s] Obstacle detected -- replanned remaining route "
+                      f"({planner.replan_count} replan(s) so far)")
+                draw_planned_scene(viewer_ctx, planner)
 
             pos_des = traj.position(t)
             vel_des = traj.velocity(t)

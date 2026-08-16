@@ -27,7 +27,14 @@ import numpy as np
 from stage1_dynamics_attitude import quaternion_utils as qu
 
 from .logger import FlightLogger
-from .pipeline import MODEL_PATH, build_pipeline, nearest_obstacle_distance, reset_drone_state
+from .pipeline import (
+    MODEL_PATH,
+    build_pipeline,
+    draw_planned_scene,
+    frame_camera,
+    nearest_obstacle_distance,
+    reset_drone_state,
+)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(REPO_ROOT, "outputs")
@@ -47,6 +54,8 @@ def run(use_viewer: bool = False):
     if use_viewer:
         from mujoco import viewer as mujoco_viewer
         viewer_ctx = mujoco_viewer.launch_passive(model, data)
+        draw_planned_scene(viewer_ctx, planner)
+        frame_camera(viewer_ctx, model, data, planner)
 
     n_steps = int(duration / model.opt.timestep)
     wall_start = time.time()
@@ -56,6 +65,12 @@ def run(use_viewer: bool = False):
         vel = data.qvel[0:3].copy()
         q = data.qpos[3:7].copy()
         omega = data.qvel[3:6].copy()
+
+        if planner.maybe_replan(t, pos):
+            print(f"[t={t:.2f}s] Obstacle detected -- replanned remaining route "
+                  f"({planner.replan_count} replan(s) so far)")
+            if viewer_ctx is not None:
+                draw_planned_scene(viewer_ctx, planner)
 
         pos_des = traj.position(t)
         vel_des = traj.velocity(t)

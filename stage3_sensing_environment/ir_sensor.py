@@ -28,6 +28,7 @@ class IRSensor:
         noise_sigma: float = config.SENSOR_NOISE_SIGMA,
         enable_noise: bool = config.ENABLE_NOISE,
         drone_body_name: str = config.DRONE_BODY_NAME,
+        obstacle_prefix: Optional[str] = None,
         seed: Optional[int] = None,
     ):
         """
@@ -38,6 +39,13 @@ class IRSensor:
         noise_sigma: Standard deviation of Gaussian measurement noise (m).
         enable_noise: Whether measurement noise is added.
         drone_body_name: Name of drone body to exclude from ray casting.
+        obstacle_prefix: If set, hits on bodies whose name doesn't start
+            with this prefix (e.g. the ground plane, which mj_ray's
+            bodyexclude can't filter -- that only takes one body) are
+            treated as "no hit" instead of a real obstacle. None (default)
+            reports every hit, matching raw mj_ray behavior -- used by
+            ``create_obstacle_distance_fn`` below, whose entire purpose
+            *is* obstacle avoidance, not general ray sensing.
         seed: Optional random seed for reproducible noise generation.
         """
         self.model = model
@@ -46,6 +54,7 @@ class IRSensor:
         self.max_range = max_range
         self.noise_sigma = noise_sigma
         self.enable_noise = enable_noise
+        self.obstacle_prefix = obstacle_prefix
 
         self.drone_body_id = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_BODY, drone_body_name
@@ -87,6 +96,13 @@ class IRSensor:
         )
 
         hit_id = int(geomid[0]) if dist >= 0 else -1
+
+        if hit_id >= 0 and self.obstacle_prefix is not None:
+            body_id = self.model.geom_bodyid[hit_id]
+            body_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body_id) or ""
+            if not body_name.startswith(self.obstacle_prefix):
+                dist = -1.0
+                hit_id = -1
 
         if dist < 0 or dist > self.max_range:
             raw_dist = self.max_range
@@ -161,12 +177,21 @@ def create_obstacle_distance_fn(
 
     Matches Stage 2's expected signature:
         obstacle_distance_fn(position: np.ndarray, direction: np.ndarray) -> float
+
+    Filters hits to bodies named with ``config.OBSTACLE_PREFIX`` (matching
+    ``EnvironmentManager``'s own convention for "what counts as an obstacle"
+    in environment.py) -- mj_ray's bodyexclude only accepts the drone body,
+    so without this a downward-facing probe direction would report the
+    ground plane itself as "the nearest obstacle" at a distance equal to the
+    drone's altitude, which is exactly the kind of false positive Stage 2's
+    planner needs *not* to see.
     """
     sensor = IRSensor(
         model=model,
         data=data,
         max_range=max_range,
         noise_sigma=noise_sigma,
+        obstacle_prefix=config.OBSTACLE_PREFIX,
         enable_noise=enable_noise,
     )
 

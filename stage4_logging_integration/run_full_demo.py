@@ -29,6 +29,7 @@ from stage1_dynamics_attitude import quaternion_utils as qu
 from .logger import FlightLogger
 from .pipeline import (
     MODEL_PATH,
+    build_imu_and_estimator,
     build_pipeline,
     draw_planned_scene,
     frame_camera,
@@ -49,6 +50,7 @@ def run(use_viewer: bool = False):
     planner, traj, pos_ctrl, attitude_ctrl, mixer, obstacle_distance_fn = build_pipeline(model, data)
     duration = traj.duration
     logger = FlightLogger()
+    imu, estimator = build_imu_and_estimator(model, data)
 
     viewer_ctx = None
     if use_viewer:
@@ -63,8 +65,9 @@ def run(use_viewer: bool = False):
         t = data.time
         pos = data.qpos[0:3].copy()
         vel = data.qvel[0:3].copy()
-        q = data.qpos[3:7].copy()
-        omega = data.qvel[3:6].copy()
+
+        accel_meas, gyro_meas = imu.read()
+        q_est = estimator.update(accel_meas, gyro_meas, model.opt.timestep)
 
         if planner.maybe_replan(t, pos):
             print(f"[t={t:.2f}s] Obstacle detected -- replanned remaining route "
@@ -78,14 +81,16 @@ def run(use_viewer: bool = False):
         yaw_des = traj.yaw(t)
 
         thrust_des, q_des = pos_ctrl.compute(pos, vel, pos_des, vel_des, acc_des, yaw_des)
-        torque = attitude_ctrl.compute_torque(q, omega, q_des)
+        # Rate feedback comes straight off the raw gyro, matching a real
+        # flight controller -- only attitude needs the accel/gyro fusion.
+        torque = attitude_ctrl.compute_torque(q_est, gyro_meas, q_des)
         motor_thrusts = mixer.allocate(thrust_des, torque)
         data.ctrl[:] = motor_thrusts
 
         obstacle_dist = nearest_obstacle_distance(obstacle_distance_fn, pos)
 
         mujoco.mj_step(model, data)
-        logger.record(t, pos, pos_des, q, q_des, omega, motor_thrusts, obstacle_dist)
+        logger.record(t, pos, pos_des, q_est, q_des, gyro_meas, motor_thrusts, obstacle_dist)
 
         if viewer_ctx is not None:
             viewer_ctx.sync()
@@ -148,12 +153,12 @@ def save_plot(logger: FlightLogger, planner):
     euler = np.array([qu.quat_to_euler_deg(q) for q in arrs["q"]])
     euler_des = np.array([qu.quat_to_euler_deg(q) for q in arrs["q_des"]])
     for i, label in enumerate(["roll", "pitch", "yaw"]):
-        axes[1, 1].plot(t, euler[:, i], label=f"{label} actual")
+        axes[1, 1].plot(t, euler[:, i], label=f"{label} IMU est.")
         axes[1, 1].plot(t, euler_des[:, i], "--", label=f"{label} desired")
     axes[1, 1].set_ylabel("Angle (deg)")
     axes[1, 1].set_xlabel("Time (s)")
     axes[1, 1].legend(ncol=3, fontsize=8)
-    axes[1, 1].set_title("Attitude tracking")
+    axes[1, 1].set_title("Attitude tracking (IMU/Mahony estimate vs. desired)")
     axes[1, 1].grid(True, alpha=0.3)
 
     fig.tight_layout()

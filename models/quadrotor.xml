@@ -92,6 +92,7 @@
   <sensor>
     <framequat name="imu_quat" objtype="site" objname="imu_site"/>
     <gyro name="imu_gyro" site="imu_site"/>
+    <accelerometer name="imu_accel" site="imu_site"/>
     <framepos name="drone_pos" objtype="site" objname="imu_site"/>
     <framelinvel name="drone_linvel" objtype="site" objname="imu_site"/>
   </sensor>

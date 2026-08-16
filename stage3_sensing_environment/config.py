@@ -13,6 +13,13 @@ SENSOR_MAX_RANGE = 10.0  # m, distances above this (or ray misses) are clipped t
 SENSOR_NOISE_SIGMA = 0.01  # m, standard deviation of zero-mean Gaussian measurement noise
 ENABLE_NOISE = True  # whether noise is applied by default in sensor measurements
 
+# --- IMU (gyro + accelerometer) noise specifications ---------------------------
+# Roughly MEMS-IMU-grade magnitudes (e.g. MPU6050-class), not a specific datasheet.
+IMU_GYRO_NOISE_STD = 0.01  # rad/s, gyro white measurement noise std dev
+IMU_ACCEL_NOISE_STD = 0.05  # m/s^2, accelerometer white measurement noise std dev
+IMU_GYRO_BIAS_WALK_STD = 0.0002  # rad/s per sample, gyro bias random-walk step std dev
+IMU_ENABLE_NOISE = True  # whether noise/bias are applied by default
+
 # --- Model & Scene naming conventions -----------------------------------------
 DRONE_BODY_NAME = "drone"  # body name to exclude from ray casting to avoid self-collision
 OBSTACLE_PREFIX = "obstacle"  # default prefix for obstacle bodies in MuJoCo worldbody

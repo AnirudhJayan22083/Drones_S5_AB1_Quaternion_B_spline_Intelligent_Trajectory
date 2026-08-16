@@ -58,6 +58,26 @@ HOVER_THRUST_PER_MOTOR = HOVER_THRUST_TOTAL / 4.0
 ATTITUDE_KP = np.array([6.0, 6.0, 3.0])
 ATTITUDE_KD = np.array([1.2, 1.2, 0.8])
 
+# --- IMU attitude estimator (Mahony complementary filter) gains ---------------
+# kp: how fast the accelerometer's gravity reference pulls the gyro-integrated
+# estimate back to level (per second of error). ki: how fast a constant gyro
+# bias is learned and cancelled. See stage1_dynamics_attitude/attitude_estimator.py.
+#
+# Deliberately small: this quadrotor's only external force is motor thrust
+# along its own body Z axis, so the accelerometer reading is *always* along
+# body Z -- it carries no independent tilt information beyond "trust the
+# thrust axis" (there's no drag/aero force to disambiguate hover from a
+# sustained deliberate tilt). A large kp therefore doesn't just trim slow
+# gyro drift -- it actively fights every commanded tilt, pulling the
+# estimate back toward level and feeding the controller a stale reference
+# while the real vehicle keeps moving, which desyncs estimate from truth
+# and destabilizes the loop. These gains keep the accelerometer correction
+# slow enough (time constant far longer than a maneuver) to only trim gyro
+# bias, leaving fast/dynamic attitude entirely to gyro integration -- as it
+# should be, since gyro is the trustworthy sensor here.
+ESTIMATOR_KP = 0.03
+ESTIMATOR_KI = 0.002
+
 # --- Simulation ---------------------------------------------------------------
 SIM_TIMESTEP = 0.002  # s, must match <option timestep="..."/> in the XML
 MODEL_XML_PATH = "models/quadrotor.xml"

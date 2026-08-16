@@ -12,8 +12,9 @@ that get written to ``data.ctrl``.
 """
 
 from .attitude_controller import AttitudeController
+from .attitude_estimator import AttitudeEstimator
 from .mixer import MotorMixer
 from . import config
 from . import quaternion_utils
 
-__all__ = ["AttitudeController", "MotorMixer", "config", "quaternion_utils"]
+__all__ = ["AttitudeController", "AttitudeEstimator", "MotorMixer", "config", "quaternion_utils"]

@@ -23,8 +23,11 @@ import matplotlib
 import mujoco
 import numpy as np
 
+from stage3_sensing_environment.imu_sensor import IMUSensor
+
 from . import config
 from .attitude_controller import AttitudeController
+from .attitude_estimator import AttitudeEstimator
 from .mixer import MotorMixer
 from . import quaternion_utils as qu
 
@@ -89,7 +92,17 @@ def run(duration: float = 6.0, use_viewer: bool = False):
 
     controller, mixer = build_controller_and_mixer()
 
-    log = {"t": [], "pos": [], "q": [], "q_des": [], "err_deg": []}
+    # IMU (gyro + accelerometer, noise + gyro-bias drift) feeding a Mahony
+    # complementary filter -- the controller below tracks this *estimated*
+    # quaternion, not MuJoCo's ground truth, so the plot reflects what a
+    # real flight controller actually has to work with. The estimator is
+    # seeded with the true initial attitude to model a pre-arm leveling
+    # calibration, isolating steady-state tracking noise from cold-start
+    # convergence (a separate effect, not what this demo is about).
+    imu = IMUSensor(model, data, seed=7)
+    estimator = AttitudeEstimator(kp=config.ESTIMATOR_KP, ki=config.ESTIMATOR_KI, q0=q0)
+
+    log = {"t": [], "pos": [], "q": [], "q_est": [], "q_des": [], "err_deg": []}
 
     viewer_ctx = None
     if use_viewer:
@@ -101,21 +114,27 @@ def run(duration: float = 6.0, use_viewer: bool = False):
     for step in range(n_steps):
         t = data.time
         q = data.qpos[3:7].copy()
-        omega = data.qvel[3:6].copy()
+
+        accel_meas, gyro_meas = imu.read()
+        q_est = estimator.update(accel_meas, gyro_meas, model.opt.timestep)
+
         q_des = desired_quat_at(t)
         thrust_des = thrust_for_quat(q_des)
 
-        torque = controller.compute_torque(q, omega, q_des)
+        # Rate feedback also comes straight off the (raw) gyro, matching a
+        # real flight controller -- only attitude needs the accel fusion.
+        torque = controller.compute_torque(q_est, gyro_meas, q_des)
         motor_thrusts = mixer.allocate(thrust_des, torque)
         data.ctrl[:] = motor_thrusts
 
         mujoco.mj_step(model, data)
 
-        q_e = qu.quat_error(q, q_des)
+        q_e = qu.quat_error(q_est, q_des)
         err_deg = np.degrees(2.0 * np.arccos(np.clip(abs(q_e[0]), -1.0, 1.0)))
         log["t"].append(t)
         log["pos"].append(data.qpos[0:3].copy())
         log["q"].append(q)
+        log["q_est"].append(q_est)
         log["q_des"].append(q_des)
         log["err_deg"].append(err_deg)
 
@@ -149,29 +168,40 @@ def save_plot(log):
     err_deg = np.array(log["err_deg"])
     pos = np.array(log["pos"])
     euler = np.array([qu.quat_to_euler_deg(q) for q in log["q"]])
+    euler_est = np.array([qu.quat_to_euler_deg(q) for q in log["q_est"]])
     euler_des = np.array([qu.quat_to_euler_deg(q) for q in log["q_des"]])
+    est_err_deg = np.degrees([
+        2.0 * np.arccos(np.clip(abs(qu.quat_error(qe, qt)[0]), -1.0, 1.0))
+        for qe, qt in zip(log["q_est"], log["q"])
+    ])
 
-    fig, axes = plt.subplots(3, 1, figsize=(9, 9), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(9, 11), sharex=True)
 
     axes[0].plot(t, err_deg)
     axes[0].set_ylabel("Attitude error (deg)")
-    axes[0].set_title("Stage 1: quaternion attitude hold")
+    axes[0].set_title("Stage 1: quaternion attitude hold (tracking the IMU estimate)")
     axes[0].grid(True, alpha=0.3)
 
     labels = ["roll", "pitch", "yaw"]
     for i, label in enumerate(labels):
-        axes[1].plot(t, euler[:, i], label=f"{label} actual")
+        axes[1].plot(t, euler[:, i], label=f"{label} true")
+        axes[1].plot(t, euler_est[:, i], ":", label=f"{label} IMU est.")
         axes[1].plot(t, euler_des[:, i], "--", label=f"{label} desired")
     axes[1].set_ylabel("Angle (deg)")
-    axes[1].legend(ncol=3, fontsize=8)
+    axes[1].legend(ncol=3, fontsize=7)
     axes[1].grid(True, alpha=0.3)
 
-    axes[2].plot(t, pos[:, 2], label="altitude")
-    axes[2].axhline(1.0, color="gray", linestyle=":", label="start altitude")
-    axes[2].set_ylabel("Altitude (m)")
-    axes[2].set_xlabel("Time (s)")
-    axes[2].legend(fontsize=8)
+    axes[2].plot(t, est_err_deg, color="tab:purple")
+    axes[2].set_ylabel("Estimator error (deg)")
+    axes[2].set_title("|q_est - q_true| -- Mahony filter accuracy")
     axes[2].grid(True, alpha=0.3)
+
+    axes[3].plot(t, pos[:, 2], label="altitude")
+    axes[3].axhline(1.0, color="gray", linestyle=":", label="start altitude")
+    axes[3].set_ylabel("Altitude (m)")
+    axes[3].set_xlabel("Time (s)")
+    axes[3].legend(fontsize=8)
+    axes[3].grid(True, alpha=0.3)
 
     fig.tight_layout()
     out_path = os.path.join(OUTPUT_DIR, "stage1_hover_tracking.png")

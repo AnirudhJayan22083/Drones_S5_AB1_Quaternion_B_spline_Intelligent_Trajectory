@@ -11,6 +11,7 @@ import mujoco
 import numpy as np
 
 from stage1_dynamics_attitude.attitude_controller import AttitudeController
+from stage1_dynamics_attitude.attitude_estimator import AttitudeEstimator
 from stage1_dynamics_attitude.mixer import MotorMixer
 from stage1_dynamics_attitude import config as s1_config
 
@@ -23,6 +24,7 @@ from stage2_trajectory_planning.bspline import BSplineTrajectory
 from stage2_trajectory_planning.position_controller import PositionController
 
 from stage3_sensing_environment import create_obstacle_distance_fn
+from stage3_sensing_environment.imu_sensor import IMUSensor
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(REPO_ROOT, "models", "quadrotor.xml")
@@ -105,6 +107,31 @@ def build_pipeline(model: mujoco.MjModel, data: mujoco.MjData):
     )
 
     return planner, traj, pos_ctrl, attitude_ctrl, mixer, obstacle_distance_fn
+
+
+def build_imu_and_estimator(model: mujoco.MjModel, data: mujoco.MjData):
+    """
+    Build the Stage 3 IMU (gyro + accelerometer, noise + gyro-bias drift)
+    and Stage 1's Mahony-filter ``AttitudeEstimator`` that fuses it into a
+    quaternion estimate -- both ``run_full_demo.py`` and ``live_viewer.py``
+    feed ``attitude_ctrl.compute_torque`` this estimate (and the raw gyro
+    for rate feedback) rather than MuJoCo's ground-truth ``qpos[3:7]``, so
+    the pipeline tracks what a real flight controller would actually see.
+
+    The estimator is seeded with ``data``'s current true attitude to model
+    a pre-arm leveling calibration, isolating steady-state tracking noise
+    from cold-start convergence transients. Call after ``reset_drone_state``
+    (or any other pose initialization) so the seed matches the drone's
+    actual starting attitude.
+
+    Returns: (imu: IMUSensor, estimator: AttitudeEstimator)
+    """
+    imu = IMUSensor(model, data, seed=7)
+    estimator = AttitudeEstimator(
+        kp=s1_config.ESTIMATOR_KP, ki=s1_config.ESTIMATOR_KI,
+        q0=data.qpos[3:7].copy(),
+    )
+    return imu, estimator
 
 
 def nearest_obstacle_distance(obstacle_distance_fn, point: np.ndarray) -> float:

@@ -84,10 +84,18 @@ def synthetic_obstacle_distance_fn(position: np.ndarray, direction: np.ndarray,
     return min(best, max_range)
 
 
-def build_planner() -> AdaptiveBSplinePlanner:
+def build_planner(model: mujoco.MjModel = None, data: mujoco.MjData = None) -> AdaptiveBSplinePlanner:
+    obs_fn = synthetic_obstacle_distance_fn
+    if model is not None and data is not None:
+        try:
+            from stage3_sensing_environment import create_obstacle_distance_fn
+            obs_fn = create_obstacle_distance_fn(model, data, enable_noise=False)
+        except ImportError:
+            pass
+
     return AdaptiveBSplinePlanner(
         WAYPOINTS,
-        obstacle_distance_fn=synthetic_obstacle_distance_fn,
+        obstacle_distance_fn=obs_fn,
         safe_distance=config.SAFE_DISTANCE,
         gain=config.PERTURB_GAIN,
         max_shift=config.MAX_PERTURB_SHIFT,
@@ -124,13 +132,13 @@ def run(use_viewer: bool = False):
     model = mujoco.MjModel.from_xml_path(MODEL_PATH)
     data = mujoco.MjData(model)
 
-    planner = build_planner()
-    traj = planner.plan()
-    duration = traj.duration
-
     data.qpos[0:3] = WAYPOINTS[0]
     data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
     mujoco.mj_forward(model, data)
+
+    planner = build_planner(model, data)
+    traj = planner.plan()
+    duration = traj.duration
 
     pos_ctrl, attitude_ctrl, mixer = build_controllers()
 

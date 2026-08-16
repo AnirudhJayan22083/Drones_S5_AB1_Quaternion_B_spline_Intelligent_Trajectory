@@ -192,9 +192,9 @@ q_e = q_d^{-1}\otimes q = (q_{e0},\vec q_e)^\top ,
 $$
 
 which satisfies $q_e\to(1,0,0,0)^\top$ as $q\to q_d$. With angular-rate error
-$\tilde\Omega=\Omega-\Omega_d$, the implemented control law (a Fresk & Nikolakopoulos
-(2013)-style PD law, structurally the sign-based analogue of the $K_\Omega(\tilde\Omega
-+K_q\vec q_e)$ law of Theorem 1 in the base paper) is
+$\tilde\Omega=\Omega-\Omega_d$, the implemented control law (a sign-based PD law,
+structurally the same as the $K_\Omega(\tilde\Omega+K_q\vec q_e)$ law of Theorem 1 in
+the base paper) is
 
 $$
 \tau = -K_p\,\mathrm{sgn}(q_{e0})\,\vec q_e \;-\; K_d\,\tilde\Omega \;+\; \Omega\times(I\Omega),
@@ -205,9 +205,12 @@ implemented in
 The $\mathrm{sgn}(q_{e0})$ factor always selects the shorter rotational path (since $q$
 and $-q$ represent the same physical attitude), avoiding the "unwinding" phenomenon the
 base paper's Section 5.3 handles by matching the sign of $q_{d_0}$ to $q_0$ at every
-re-initialization; the final term $\Omega\times(I\Omega)$ is the gyroscopic
-feedforward that cancels rigid-body Coriolis coupling, i.e. the base paper's
-$S(\Omega)I\Omega$ term in Eq. (23)/(24). Substituting the control law into the
+re-initialization; the final term $\Omega\times(I\Omega)$ is a gyroscopic feedforward
+that exactly cancels the rigid-body Coriolis coupling term $-S(\Omega)I\Omega$ present
+in the rotational dynamics — the same $-S(\Omega)I\Omega$ term that appears in the
+base paper's own error dynamics, Eq. (23), though the base paper's feedforward $\tau_d$
+(Eq. (22)) is a more general trajectory-tracking term built from $\Omega_d$ rather than
+this simpler current-rate cancellation. Substituting the control law into the
 rotational dynamics yields the (locally, around $q_e=(1,0,0,0)^\top$) exponentially
 stable closed-loop error dynamics established via the Lyapunov argument of the base
 paper's Theorem 1:
@@ -220,25 +223,43 @@ $$
 
 ### 4. Position (Outer-Loop) Control
 
-Following the differentially-flat quadrotor formulation (Mellinger & Kumar style, and
-structurally equivalent to the base paper's trajectory controller of Theorem 2), the
-translational error $\tilde\zeta=\zeta-\zeta_d$ obeys $m\ddot{\tilde\zeta}= mge_3 -
-TRe_3 -m\ddot\zeta_d$. Choosing the commanded acceleration
+This project's position controller follows the same overall strategy as the base
+paper's Theorem 2 (and the differentially-flat quadrotor approach more generally):
+algebraically derive a desired thrust magnitude and full attitude from a commanded
+acceleration, without linearizing the dynamics about an equilibrium point, and prove
+the resulting closed-loop translational error dynamics are stable. The specific
+derivation implemented here uses the more common PD-plus-feedforward sign convention
+(error defined as desired-minus-actual) rather than the base paper's own algebraic
+form, so the equations below should be read as *this project's* controller, not a
+line-for-line transcription of the base paper's Theorem 2.
+
+With translational error $\tilde\zeta=\zeta-\zeta_d$ and thrust $T$ acting along the
+commanded body $+Z$ axis $z_b$ (z-up convention), the dynamics obey
+$m\ddot\zeta = Tz_b - mge_3$. Choosing the commanded acceleration
 
 $$
 a_{cmd} = K_p\big(\zeta_d-\zeta\big) + K_d\big(\dot\zeta_d-\dot\zeta\big) + \ddot\zeta_d + ge_3
 $$
 
-drives the linear error dynamics $m\ddot{\tilde\zeta}=-K_p\tilde\zeta-K_d\dot{\tilde\zeta}$
-to zero (Theorem 2 of the base paper, exponentially stable for diagonal positive-definite
-$K_p,K_d$). The desired body $+Z$ axis, thrust magnitude, and full attitude are then
-recovered algebraically (this project's version of the base paper's $x_{con},y_{con},z_{con}$
-/ Eq. (44)–(47) derivation):
+and setting $z_b=a_{cmd}/\lVert a_{cmd}\rVert$, $T_d=m\lVert a_{cmd}\rVert$ (so that
+$T_dz_b=m\,a_{cmd}$) drives the closed-loop error dynamics to
+
+$$
+\ddot{\tilde\zeta} = -K_p\tilde\zeta-K_d\dot{\tilde\zeta},
+$$
+
+exponentially stable for diagonal positive-definite $K_p,K_d$ (here $K_p,K_d$ are
+acceleration gains, matching the units used in
+[`position_controller.py`](stage2_trajectory_planning/position_controller.py); note
+this differs from a force-gain convention, where the equation would carry a leading
+$m$). The desired body $+Z$ axis, thrust magnitude, and full attitude are then
+recovered algebraically (via a rotation-matrix construction, not the base paper's own
+closed-form $q_0$ quadratic solve in Eq. (44)–(47)):
 
 $$
 z_b = \frac{a_{cmd}}{\lVert a_{cmd}\rVert}, \qquad
 T_d = m\,a_{cmd}\cdot z_b, \qquad
-x_b = y_b\times z_b, \quad y_b = \frac{z_b\times x_c}{\lVert z_b\times x_c\rVert},
+y_b = \frac{z_b\times x_c}{\lVert z_b\times x_c\rVert}, \quad x_b = y_b\times z_b,
 $$
 
 where $x_c=(\cos\psi_d,\sin\psi_d,0)^\top$ encodes the desired heading $\psi_d$, and
@@ -288,14 +309,14 @@ $$
 
 Stage 3 provides a ray-cast distance reading $d(\mathbf x,\mathbf n)$ from a point
 $\mathbf x$ along direction $\mathbf n$. For each interior control point $P_i$, the
-nearest sensed obstacle distance $d^\*=\min_{\mathbf n\in\mathcal D} d(P_i,\mathbf n)$
+nearest sensed obstacle distance $d^*=\min_{\mathbf n\in\mathcal D} d(P_i,\mathbf n)$
 is found by probing a fixed direction set $\mathcal D$ (cube-face + corner normals). If
-$d^\*$ falls below a safety margin $d_{\text{safe}}$ (drone body radius + clearance), the
+$d^*$ falls below a safety margin $d_{\text{safe}}$ (drone body radius + clearance), the
 control point is perturbed away from the obstacle along the sensed direction
-$\mathbf n^\*$:
+$\mathbf n^*$:
 
 $$
-P_i \leftarrow P_i - \mathbf n^\* \cdot \min\big(k_{\text{gain}}\,(d_{\text{safe}}-d^\*),\; \delta_{\max}\big),
+P_i \leftarrow P_i - \mathbf n^* \cdot \min\big(k_{\text{gain}}\,(d_{\text{safe}}-d^*),\; \delta_{\max}\big),
 $$
 
 with gain $k_{\text{gain}}$ and a per-step cap $\delta_{\max}$ for numerical stability
@@ -304,7 +325,7 @@ curve is resampled and the check repeated for up to $N_{\text{iters}}$ passes, s
 B-spline only interpolates its end control points — pushing a control point clear does
 not by itself guarantee the *curve* clears the obstacle (corner-cutting). At the flight
 level, `ReactiveReplanner` triggers this procedure online, from the drone's live
-position, only once $d^\*$ drops below a detection radius $d_{\text{det}} >
+position, only once $d^*$ drops below a detection radius $d_{\text{det}} >
 d_{\text{safe}}$, with hysteresis re-arming above $d_{\text{rearm}} > d_{\text{det}}$
 and a minimum inter-replan gap, so the trajectory reacts to obstacles it did not know
 about at takeoff without chattering between replans.
@@ -407,21 +428,3 @@ flight-controller ABI — to the target LiteWing ESP32 hardware.
    Quadrotors," *Proceedings of the Australasian Conference on Robotics and Automation
    (ACRA)*, Melbourne, 2014.
    [PDF](https://www.araa.asn.au/acra/acra2014/papers/pap105.pdf)
-2. R. Mahony, T. Hamel, and J.-M. Pflimlin, "Nonlinear Complementary Filters on the
-   Special Orthogonal Group," *IEEE Transactions on Automatic Control*, vol. 53, no. 5,
-   2008.
-3. D. Mellinger and V. Kumar, "Minimum Snap Trajectory Generation and Control for
-   Quadrotors," *IEEE International Conference on Robotics and Automation (ICRA)*, 2011.
-4. T. Lee, M. Leok, and N. H. McClamroch, "Geometric Tracking Control of a Quadrotor UAV
-   on SE(3)," *IEEE Conference on Decision and Control (CDC)*, 2010.
-5. A. Tayebi and S. McGilvray, "Attitude Stabilization of a VTOL Quadrotor Aircraft,"
-   *IEEE Transactions on Control Systems Technology*, vol. 14, no. 3, 2006.
-6. L. Piegl and W. Tiller, *The NURBS Book*, 2nd ed., Springer, 1997 — Cox–de Boor
-   recursion and B-spline derivative identities used in Stage 2's implementation.
-7. E. Fresk and G. Nikolakopoulos, "Full Quaternion Based Attitude Control for a
-   Quadrotor," *European Control Conference (ECC)*, 2013 — the sign-based error-quaternion
-   PD law this project's `AttitudeController` follows.
-8. T. Hamel, R. Mahony, R. Lozano, and J. Ostrowski, "Dynamic Modelling and Configuration
-   Stabilization for an X4-Flyer," *IFAC World Congress*, 2002.
-9. MuJoCo Physics Engine documentation — <https://mujoco.readthedocs.io/> (simulation
-   backend used throughout this project).

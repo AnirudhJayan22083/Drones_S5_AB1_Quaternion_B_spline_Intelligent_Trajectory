@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile stage2_trajectory_planning/run_trajectory_demo.py stage2_trajectory_planning/bspline.py stage2_trajectory_planning/adaptive_planner.py stage2_trajectory_planning/position_controller.py stage2_trajectory_planning/config.py stage2_trajectory_planning/__init__.py stage1_dynamics_attitude/quaternion_utils.py)",
+      "Bash(python -c ' *)",
+      "Bash(python -m stage2_trajectory_planning.run_trajectory_demo)"
+    ]
+  }
+}

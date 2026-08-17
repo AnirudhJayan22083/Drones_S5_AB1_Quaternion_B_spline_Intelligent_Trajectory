@@ -141,7 +141,7 @@ derived further here.
 
 ### 1. B-Spline Trajectory Generation
 
-A degree-$p$ (cubic, $p=3$) B-spline curve over control points
+A degree - $p$ (cubic, $p=3$) B-spline curve over control points
 $P_0,\dots,P_n$ and a clamped, uniform knot vector $U=\{u_0,\dots,u_m\}$ is evaluated
 via the Cox–de Boor recursion
 

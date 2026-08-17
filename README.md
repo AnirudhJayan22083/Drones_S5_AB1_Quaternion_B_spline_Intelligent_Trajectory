@@ -182,31 +182,53 @@ $$
 Attitude is estimated onboard from IMU data alone (accelerometer + gyroscope, no
 magnetometer) using an explicit-complementary (Mahony) filter, fusing a fast but
 drifting gyro-integration term with a slow, drift-free correction derived from the
-accelerometer's measured gravity direction (Mahony, Hamel & Pflimlin, 2008). Quaternion
-kinematics follow $\dot q = \tfrac12\,q\otimes\mathfrak p(\Omega)$, with
-$\mathfrak p(\Omega):=(0,\Omega)^\top$ and $\otimes$ the Hamilton product implemented in
-[`quaternion_utils.quat_mul`](stage1_dynamics_attitude/quaternion_utils.py). At each
-step, the direction gravity *should* point in the body frame given the current estimate
-$q$ is compared against the measured "up" direction from the accelerometer, giving a
-rotational error
+accelerometer's measured gravity direction (Mahony, Hamel & Pflimlin, 2008). Let the
+current quaternion estimate be $q_k$. The IMU gives two readings each step: the
+gyroscope's angular velocity $\omega_{gyro}$ (all 3 axes) and the accelerometer's
+specific-force reading. The IMU sample rate is 100 Hz, so $\Delta t = 0.01\,\mathrm s$.
+
+**Gyro propagation.** From quaternion kinematics, the quaternion rate is
 
 $$
-e = \hat a \times R(q)^\top e_3 ,
+\dot q = \tfrac12\,q_k\otimes\begin{bmatrix}0\\ \omega_{gyro}\end{bmatrix},
 $$
 
-where $\hat a$ is the normalized accelerometer reading and $R(q)^\top e_3$ is world
-$+Z$ rotated into the body frame by the current estimate. This error both slowly learns
-and cancels a constant gyro bias (via an integral gain $k_i$, since gyro bias would
-otherwise integrate into unbounded drift) and is fed forward as a proportional
-correction ($k_p$) directly into the gyro rate before integration:
+with $\otimes$ the Hamilton product implemented in
+[`quaternion_utils.quat_mul`](stage1_dynamics_attitude/quaternion_utils.py). Integrating
+one step and renormalizing to keep a unit quaternion gives the propagated estimate
 
 $$
-\hat\Omega = \omega_{\text{gyro}} + b + k_p\,e, \qquad \dot b = k_i\,e,
+q_{k+1} = q_k + \dot q\,\Delta t, \qquad q_{k+1}\leftarrow \mathrm{normalize}(q_{k+1}).
 $$
 
+Gyro integration alone drifts, so the accelerometer reading is used to correct the
+drift caused by gravity.
+
+**Accelerometer correction.** Let $a$ be the normalized accelerometer reading. The
+error is found by comparing $a$ against the direction gravity *should* point in the
+body frame given the current estimate $q_k$:
+
 $$
-\dot q = \tfrac12\,q\otimes\mathfrak p(\hat\Omega), \qquad q \leftarrow
-\mathrm{normalize}(q + \dot q\,\Delta t).
+\hat g = q_k^{-1}\otimes(0,0,0,1)\otimes q_k, \qquad e = \hat g\times a .
+$$
+
+This error corrects the gyro reading before integration, both as an immediate
+proportional term and as a slowly-accumulated integral term that learns and cancels a
+persistent gyro bias:
+
+$$
+\omega_c = \omega_{gyro} + K_p\,e + K_i\!\int e\,dt ,
+$$
+
+where $K_p$ sets how aggressively the current misalignment is corrected (higher $K_p$
+means faster correction, but lets more accelerometer noise into the outcome), $K_i$
+sets how quickly a persistent error is learned as a bias correction, and $\int e\,dt$
+is the accumulated error over time. The final estimate uses this corrected rate in
+place of the raw gyro reading:
+
+$$
+\dot q_c = \tfrac12\,q_k\otimes\begin{bmatrix}0\\ \omega_c\end{bmatrix}, \qquad
+q_{k+1} = q_k + \dot q_c\,\Delta t .
 $$
 
 Because only gravity (not magnetic north) is observed, roll and pitch are fully

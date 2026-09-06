@@ -15,13 +15,7 @@
 
 # Quaternion-Based-Autonomous-Quadrotor-Navigation-using-adaptive-B-Spline-Trajectory-Generation
 
----
 
-## Title
-
-**Quaternion-Based-Autonomous-Quadrotor-Navigation-using-adaptive-B-Spline-Trajectory-Generation**
-
----
 
 ## Abstract
 
@@ -138,138 +132,16 @@ codebase. Notation mostly follows the base paper (Bangura *et al.*, 2014, cited 
 $\zeta=(x,y,z)^\top$, and unit quaternion $q=(q_0,\vec q)^\top$, $\vec
 q=(q_1,q_2,q_3)^\top$, $\lVert q\rVert=1$.
 
-### 1. Rigid-Body Dynamics
+Motor mixing (converting commanded total thrust $T$ and body torque $\tau$ into the
+four individual per-motor thrust values for the "+"-configuration rotors, saturated to
+each motor's $[T_{\min},T_{\max}]$ range — see
+[`mixer.py`](stage1_dynamics_attitude/mixer.py)) sits between the attitude controller
+and the simulated actuators; it is a fixed-geometry linear allocation and is not
+derived further here.
 
-The quadrotor is modeled as a rigid body of mass $m$ and inertia tensor
-$I=\mathrm{diag}(I_{xx},I_{yy},I_{zz})$, actuated by a total thrust $T$ along the body
-$+Z$ axis and a body torque $\tau=(\tau_x,\tau_y,\tau_z)^\top$:
+### 1. B-Spline Trajectory Generation
 
-$$
-\dot\zeta = v, \qquad
-m\dot v = mge_3 - TRe_3, \qquad
-\dot R = RS(\Omega), \qquad
-I\dot\Omega = -S(\Omega)I\Omega + \tau,
-$$
-
-where $R\in SO(3)$ is the body-to-world rotation, $\Omega$ is the body-frame angular
-velocity, $e_3=(0,0,1)^\top$, and $S(\cdot)$ is the skew-symmetric cross-product
-matrix, $S(\Omega)w=\Omega\times w$. The quaternion kinematics equivalent to $\dot
-R=RS(\Omega)$ is
-
-$$
-\dot q = \tfrac12\, q\otimes\mathfrak p(\Omega), \qquad \mathfrak p(\Omega):=(0,\Omega)^\top,
-$$
-
-with $\otimes$ the Hamilton product implemented in
-[`quaternion_utils.quat_mul`](stage1_dynamics_attitude/quaternion_utils.py).
-
-### 2. Motor Mixing
-
-The four "+"-configuration rotors, each at position $p_i$ in the body frame with spin
-direction $s_i=\pm1$ and yaw-drag coefficient $\kappa$, produce the wrench
-
-$$
-\begin{bmatrix}T\\\tau_x\\\tau_y\\\tau_z\end{bmatrix}
-= \underbrace{\begin{bmatrix}
-1 & 1 & 1 & 1\\
-p_{1y} & p_{2y} & p_{3y} & p_{4y}\\
--p_{1x} & -p_{2x} & -p_{3x} & -p_{4x}\\
-s_1\kappa & s_2\kappa & s_3\kappa & s_4\kappa
-\end{bmatrix}}_{A}
-\begin{bmatrix}f_1\\f_2\\f_3\\f_4\end{bmatrix},
-$$
-
-a fixed-geometry linear allocation map (analogous to Eq. (3) of the base paper). Per-motor
-thrusts are recovered as $f=A^{-1}[T,\tau]^\top$ and saturated to
-$[T_{\min},T_{\max}]$ — see [`mixer.py`](stage1_dynamics_attitude/mixer.py).
-
-### 3. Quaternion Attitude Control
-
-Given current attitude $q$ and desired attitude $q_d$, the attitude error quaternion is
-
-$$
-q_e = q_d^{-1}\otimes q = (q_{e0},\vec q_e)^\top ,
-$$
-
-which satisfies $q_e\to(1,0,0,0)^\top$ as $q\to q_d$. With angular-rate error
-$\tilde\Omega=\Omega-\Omega_d$, the implemented control law (a sign-based PD law,
-structurally the same as the $K_\Omega(\tilde\Omega+K_q\vec q_e)$ law of Theorem 1 in
-the base paper) is
-
-$$
-\tau = -K_p\,\mathrm{sgn}(q_{e0})\,\vec q_e \;-\; K_d\,\tilde\Omega \;+\; \Omega\times(I\Omega),
-$$
-
-implemented in
-[`attitude_controller.compute_torque`](stage1_dynamics_attitude/attitude_controller.py).
-The $\mathrm{sgn}(q_{e0})$ factor always selects the shorter rotational path (since $q$
-and $-q$ represent the same physical attitude), avoiding the "unwinding" phenomenon the
-base paper's Section 5.3 handles by matching the sign of $q_{d_0}$ to $q_0$ at every
-re-initialization; the final term $\Omega\times(I\Omega)$ is a gyroscopic feedforward
-that exactly cancels the rigid-body Coriolis coupling term $-S(\Omega)I\Omega$ present
-in the rotational dynamics — the same $-S(\Omega)I\Omega$ term that appears in the
-base paper's own error dynamics, Eq. (23), though the base paper's feedforward $\tau_d$
-(Eq. (22)) is a more general trajectory-tracking term built from $\Omega_d$ rather than
-this simpler current-rate cancellation. Substituting the control law into the
-rotational dynamics yields the (locally, around $q_e=(1,0,0,0)^\top$) exponentially
-stable closed-loop error dynamics established via the Lyapunov argument of the base
-paper's Theorem 1:
-
-$$
-V_1(q_e,\tilde\Omega) = 2(1-q_{e0}) + \tfrac{1}{2k}\tilde\Omega^\top I\tilde\Omega,
-\qquad
-\dot V_1 = -\tfrac1k\tilde\Omega^\top K_\Omega\tilde\Omega \le 0 .
-$$
-
-### 4. Position (Outer-Loop) Control
-
-This project's position controller follows the same overall strategy as the base
-paper's Theorem 2 (and the differentially-flat quadrotor approach more generally):
-algebraically derive a desired thrust magnitude and full attitude from a commanded
-acceleration, without linearizing the dynamics about an equilibrium point, and prove
-the resulting closed-loop translational error dynamics are stable. The specific
-derivation implemented here uses the more common PD-plus-feedforward sign convention
-(error defined as desired-minus-actual) rather than the base paper's own algebraic
-form, so the equations below should be read as *this project's* controller, not a
-line-for-line transcription of the base paper's Theorem 2.
-
-With translational error $\tilde\zeta=\zeta-\zeta_d$ and thrust $T$ acting along the
-commanded body $+Z$ axis $z_b$ (z-up convention), the dynamics obey
-$m\ddot\zeta = Tz_b - mge_3$. Choosing the commanded acceleration
-
-$$
-a_{cmd} = K_p\big(\zeta_d-\zeta\big) + K_d\big(\dot\zeta_d-\dot\zeta\big) + \ddot\zeta_d + ge_3
-$$
-
-and setting $z_b=a_{cmd}/\lVert a_{cmd}\rVert$, $T_d=m\lVert a_{cmd}\rVert$ (so that
-$T_dz_b=m\,a_{cmd}$) drives the closed-loop error dynamics to
-
-$$
-\ddot{\tilde\zeta} = -K_p\tilde\zeta-K_d\dot{\tilde\zeta},
-$$
-
-exponentially stable for diagonal positive-definite $K_p,K_d$ (here $K_p,K_d$ are
-acceleration gains, matching the units used in
-[`position_controller.py`](stage2_trajectory_planning/position_controller.py); note
-this differs from a force-gain convention, where the equation would carry a leading
-$m$). The desired body $+Z$ axis, thrust magnitude, and full attitude are then
-recovered algebraically (via a rotation-matrix construction, not the base paper's own
-closed-form $q_0$ quadratic solve in Eq. (44)–(47)):
-
-$$
-z_b = \frac{a_{cmd}}{\lVert a_{cmd}\rVert}, \qquad
-T_d = m\,a_{cmd}\cdot z_b, \qquad
-y_b = \frac{z_b\times x_c}{\lVert z_b\times x_c\rVert}, \quad x_b = y_b\times z_b,
-$$
-
-where $x_c=(\cos\psi_d,\sin\psi_d,0)^\top$ encodes the desired heading $\psi_d$, and
-$q_d$ is recovered from the rotation matrix $R_d=[x_b\ y_b\ z_b]$ via Shepperd's method
-(see [`position_controller.py`](stage2_trajectory_planning/position_controller.py),
-[`quaternion_utils.quat_from_rotmat`](stage1_dynamics_attitude/quaternion_utils.py)).
-
-### 5. B-Spline Trajectory Generation
-
-A degree-$p$ (cubic, $p=3$) B-spline curve over control points
+A degree - $p$ (cubic, $p=3$) B-spline curve over control points
 $P_0,\dots,P_n$ and a clamped, uniform knot vector $U=\{u_0,\dots,u_m\}$ is evaluated
 via the Cox–de Boor recursion
 
@@ -305,30 +177,139 @@ $$
 \text{acc}(t) = \frac{1}{T_{\text{dur}}^2}\,C''(u(t)).
 $$
 
-### 6. Adaptive Obstacle Avoidance
+### 2. Quaternion Estimation
 
-Stage 3 provides a ray-cast distance reading $d(\mathbf x,\mathbf n)$ from a point
-$\mathbf x$ along direction $\mathbf n$. For each interior control point $P_i$, the
-nearest sensed obstacle distance $d^*=\min_{\mathbf n\in\mathcal D} d(P_i,\mathbf n)$
-is found by probing a fixed direction set $\mathcal D$ (cube-face + corner normals). If
-$d^*$ falls below a safety margin $d_{\text{safe}}$ (drone body radius + clearance), the
-control point is perturbed away from the obstacle along the sensed direction
-$\mathbf n^*$:
+Attitude is estimated onboard from IMU data alone (accelerometer + gyroscope, no
+magnetometer) using an explicit-complementary (Mahony) filter, fusing a fast but
+drifting gyro-integration term with a slow, drift-free correction derived from the
+accelerometer's measured gravity direction (Mahony, Hamel & Pflimlin, 2008). Let the
+current quaternion estimate be $q_k$. The IMU gives two readings each step: the
+gyroscope's angular velocity $\omega_{gyro}$ (all 3 axes) and the accelerometer's
+specific-force reading. The IMU sample rate is 100 Hz, so $\Delta t = 0.01\,\mathrm s$.
+
+**Gyro propagation.** From quaternion kinematics, the quaternion rate is
 
 $$
-P_i \leftarrow P_i - \mathbf n^* \cdot \min\big(k_{\text{gain}}\,(d_{\text{safe}}-d^*),\; \delta_{\max}\big),
+\dot q = \tfrac12\,q_k\otimes\begin{bmatrix}0\\ \omega_{gyro}\end{bmatrix},
 $$
 
-with gain $k_{\text{gain}}$ and a per-step cap $\delta_{\max}$ for numerical stability
-([`AdaptiveBSplinePlanner.plan`](stage2_trajectory_planning/adaptive_planner.py)). The
-curve is resampled and the check repeated for up to $N_{\text{iters}}$ passes, since a
-B-spline only interpolates its end control points — pushing a control point clear does
-not by itself guarantee the *curve* clears the obstacle (corner-cutting). At the flight
-level, `ReactiveReplanner` triggers this procedure online, from the drone's live
-position, only once $d^*$ drops below a detection radius $d_{\text{det}} >
-d_{\text{safe}}$, with hysteresis re-arming above $d_{\text{rearm}} > d_{\text{det}}$
-and a minimum inter-replan gap, so the trajectory reacts to obstacles it did not know
-about at takeoff without chattering between replans.
+with $\otimes$ the Hamilton product implemented in
+[`quaternion_utils.quat_mul`](stage1_dynamics_attitude/quaternion_utils.py). Integrating
+one step and renormalizing to keep a unit quaternion gives the propagated estimate
+
+$$
+q_{k+1} = q_k + \dot q\,\Delta t, \qquad q_{k+1}\leftarrow \mathrm{normalize}(q_{k+1}).
+$$
+
+Gyro integration alone drifts, so the accelerometer reading is used to correct the
+drift caused by gravity.
+
+**Accelerometer correction.** Let $a$ be the normalized accelerometer reading. The
+error is found by comparing $a$ against the direction gravity *should* point in the
+body frame given the current estimate $q_k$:
+
+$$
+\hat g = q_k^{-1}\otimes(0,0,0,1)\otimes q_k, \qquad e = \hat g\times a .
+$$
+
+This error corrects the gyro reading before integration, both as an immediate
+proportional term and as a slowly-accumulated integral term that learns and cancels a
+persistent gyro bias:
+
+$$
+\omega_c = \omega_{gyro} + K_p\,e + K_i\!\int e\,dt ,
+$$
+
+where $K_p$ sets how aggressively the current misalignment is corrected (higher $K_p$
+means faster correction, but lets more accelerometer noise into the outcome), $K_i$
+sets how quickly a persistent error is learned as a bias correction, and $\int e\,dt$
+is the accumulated error over time. The final estimate uses this corrected rate in
+place of the raw gyro reading:
+
+$$
+\dot q_c = \tfrac12\,q_k\otimes\begin{bmatrix}0\\ \omega_c\end{bmatrix}, \qquad
+q_{k+1} = q_k + \dot q_c\,\Delta t .
+$$
+
+Because only gravity (not magnetic north) is observed, roll and pitch are fully
+corrected while yaw is left to drift with the gyro. Implemented in
+[`AttitudeEstimator.update`](stage1_dynamics_attitude/attitude_estimator.py), with
+simulated IMU noise/bias from
+[`IMUSensor`](stage3_sensing_environment/imu_sensor.py) as its input.
+
+### 3. Position (Outer-Loop) Control
+
+Given the current position/velocity $\zeta,\dot\zeta$ and the desired position/velocity
+$\zeta_d,\dot\zeta_d$, the position controller computes the required thrust and how much
+to tilt the airframe to produce it.
+
+With position error $e_{pos}=\zeta_d-\zeta$ and velocity error
+$e_{vel}=\dot\zeta_d-\dot\zeta$, the desired total force is
+
+$$
+F_d = m\,g\,\hat e_3 + K_p\,e_{pos} + K_d\,e_{vel} + m\,\ddot\zeta_d ,
+$$
+
+where $m$ is the total drone mass, $g$ is gravitational acceleration,
+$\hat e_3=(0,0,1)^\top$ is the world "up" unit vector, $K_p,K_d$ are the
+position/velocity proportional and derivative gains, and $\ddot\zeta_d$ is the desired
+feedforward acceleration, sampled from the B-spline's second derivative. Since the
+underactuated quadrotor can only apply thrust along its own body $+Z$ axis, the required
+thrust magnitude is
+
+$$
+T_d = \lVert F_d\rVert ,
+$$
+
+and the desired attitude is recovered algebraically from $F_d$ together with a desired
+heading $\psi_d$:
+
+$$
+z_b = \frac{F_d}{T_d}, \qquad
+x_{yaw} = (\cos\psi_d,\ \sin\psi_d,\ 0)^\top, \qquad
+y_b = \frac{z_b\times x_{yaw}}{\lVert z_b\times x_{yaw}\rVert}, \qquad
+x_b = y_b\times z_b,
+$$
+
+where $x_{yaw}$ is the horizontal reference direction encoding the desired heading
+$\psi_d$ (since thrust can only be applied along the drone's body $Z$ axis), and $q_d$
+is recovered from the rotation matrix $R_d=[x_b\ y_b\ z_b]$ via Shepperd's method (see
+[`position_controller.py`](stage2_trajectory_planning/position_controller.py),
+[`quaternion_utils.quat_from_rotmat`](stage1_dynamics_attitude/quaternion_utils.py)).
+
+### 4. Quaternion Attitude Control
+
+This step calculates the required torque to rotate the drone from its current
+orientation to the required orientation. Let the current quaternion be $q_c$ with
+angular velocity $\Omega$, and the required quaternion be $q_{des}$.
+
+The quaternion error is
+
+$$
+q_e = q_{des}^{-1}\otimes q_c ,
+$$
+
+and the angular-velocity error is
+
+$$
+\Omega_e = \Omega - \Omega_{des} .
+$$
+
+The implemented control law is
+
+$$
+\tau = \Omega\times(I\Omega) \;-\; K_{p,att}\,\vec q_e \;-\; K_{d,att}\,\Omega_e ,
+$$
+
+implemented in
+[`attitude_controller.compute_torque`](stage1_dynamics_attitude/attitude_controller.py),
+where:
+
+- $\tau$ is the commanded body-frame torque,
+- $I$ is the drone's moment of inertia, so $\Omega\times(I\Omega)$ is the gyroscopic
+  feedforward term that cancels the rigid-body Coriolis coupling between axes,
+- $K_{p,att}$ is the proportional gain — how hard to correct the attitude error,
+- $K_{d,att}$ is the derivative gain — how hard to damp the rotation-rate error.
 
 ---
 
@@ -343,8 +324,6 @@ All results below are produced by the repository's own demo scripts
 
 | Stage | Scenario | Final error | Mean error | Max error |
 |---|---|---|---|---|
-| 1 — Dynamics & Attitude | Hover at 1.0 m, step attitude command | 0.237° (attitude) | — | — |
-| 2 — Trajectory & Position Control | Smooth multi-waypoint B-spline path, no obstacles | 0.012 m | 0.034 m | 0.146 m |
 | 4 — Full Integration | B-spline route with 2 obstacles, live IR sensing + reactive replanning | 0.240 m | 0.622 m | 2.037 m |
 
 ### Table 2 — Adaptive Obstacle Avoidance (Stage 4)
@@ -362,26 +341,13 @@ instead of MuJoCo's ground truth, IMU gyro/accelerometer noise and bias drift, a
 significantly — the multiple mid-flight replans, each of which introduces a transient
 while the position loop re-converges to a newly perturbed reference). The peak 2.037 m
 error corresponds to one of these replan transients, not steady-state divergence; the
-system recovers to sub-half-meter tracking within the following segment, as visible in
-the tracking-error plot below.
+system recovers to sub-half-meter tracking within the following segment.
 
 ### Figures
 
-**Stage 1 — Attitude tracking and hover altitude:**
+**Stage 3 flight (IR obstacle sensing demo):**
 
-![Stage 1: hover and attitude tracking](assets/results/stage1_hover_tracking.png)
-
-**Stage 2 — B-spline trajectory tracking (no obstacles):**
-
-![Stage 2: trajectory tracking](assets/results/stage2_trajectory_tracking.png)
-
-**Stage 3 — Simulated IR ray-cast obstacle sensing:**
-
-![Stage 3: sensor demo](assets/results/stage3_sensor_demo.png)
-
-**Stage 4 — Full pipeline: path, tracking error, live obstacle clearance, attitude:**
-
-![Stage 4: full integration](assets/results/stage4_full_integration.png)
+![Stage 3 sensor demo](assets/results/stage3_sensor_demo.png)
 
 **Animation — Stage 4 flight, top-down (planned path vs. flown path):**
 

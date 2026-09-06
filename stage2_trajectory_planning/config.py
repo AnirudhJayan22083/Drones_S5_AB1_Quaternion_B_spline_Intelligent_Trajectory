@@ -54,13 +54,25 @@ MAX_PLANNER_ITERS = 8
 # How close (m, from the drone's live position to the obstacle surface) an
 # obstacle has to be before ReactiveReplanner treats it as "detected" and
 # replans the remaining route -- instead of flying the naive, obstacle-blind
-# curve for the whole flight. Must leave enough room past SAFE_DISTANCE for
-# the position/attitude control loops to actually execute the avoidance
-# maneuver before reaching the obstacle -- too tight a margin here (e.g.
-# SAFE_DISTANCE + 0.2) means "detected" and "already too close to dodge"
-# are nearly the same moment, so the drone still clips the obstacle even
-# though the planner reacted correctly. See adaptive_planner.py.
-DETECTION_RANGE = SAFE_DISTANCE + 1.7
+# curve for the whole flight.
+#
+# Defined directly off DRONE_RADIUS (not SAFE_DISTANCE) because what
+# actually matters physically is body-surface-to-obstacle-surface
+# clearance at the moment of detection, not the sensor's raw
+# center-to-obstacle reading. TRIGGER_BODY_CLEARANCE below is that
+# clearance. It is NOT a free "closer feels more realistic" knob --
+# full-physics closed-loop simulation (real Stage 3 ray sensor, Stage 1/2
+# control loops, MuJoCo dynamics) shows a hard collision cliff just below
+# 0.24m: at 0.22m body clearance the drone still clips the obstacle by
+# ~4cm, and it gets worse fast the closer the trigger gets (5cm trigger ->
+# ~11.5cm penetration) simply because there isn't enough distance left, at
+# this vehicle's flight speed, for a replan + control response to change
+# the flight path before momentum carries it into the obstacle. 0.30m
+# clears that cliff with a verified ~13cm of spare body clearance -- close
+# enough to read as "reacting right at the obstacle" rather than meters
+# out, without being fragile to small perturbations. See adaptive_planner.py.
+TRIGGER_BODY_CLEARANCE = 0.30  # m, verified collision-free via simulation sweep
+DETECTION_RANGE = DRONE_RADIUS + TRIGGER_BODY_CLEARANCE
 
 # ReactiveReplanner re-arms (becomes eligible to trigger another replan)
 # only once distance climbs back above REARM_RANGE, and never fires two
@@ -71,8 +83,20 @@ DETECTION_RANGE = SAFE_DISTANCE + 1.7
 # still genuinely close (e.g. mid-turn), which would otherwise re-trigger a
 # fresh replan before the previous one had a chance to actually clear the
 # obstacle.
-REARM_RANGE = DETECTION_RANGE + 1.0
+REARM_RANGE = DETECTION_RANGE + 0.1
 MIN_REPLAN_GAP = 1.0  # s
+
+# Reacting this close to an obstacle (see TRIGGER_BODY_CLEARANCE above)
+# means the avoidance curve bends sharply right where the drone already is
+# -- flown at the same cruise speed as the calm, unobstructed legs, that
+# sharp bend demands a sudden burst of lateral acceleration, which is what
+# reads as a hard jerk to the side. A real pilot backs off the throttle for
+# a last-second dodge instead of powering through it at cruise speed, so
+# ReactiveReplanner gives the freshly-replanned segment more time to cover
+# its (often longer, detour-including) path -- only ever slower than the
+# nominal schedule, never faster. 0.4 = the replanned segment cruises at
+# 40% of the flight's normal speed.
+REPLAN_SPEED_FACTOR = 0.4
 
 # Fallback sensor range used by the placeholder obstacle-distance stub (see
 # adaptive_planner.default_obstacle_distance_fn) when no real distance

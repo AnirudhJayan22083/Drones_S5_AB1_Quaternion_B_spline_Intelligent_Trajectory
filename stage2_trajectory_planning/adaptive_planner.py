@@ -116,21 +116,30 @@ class AdaptiveBSplinePlanner:
             return traj
 
         for _ in range(self.max_iters):
-            moved = False
             interior = points[1:-1]
+            # Collect at most one shift per control point this iteration --
+            # several curve samples near a wide obstacle can all map to the
+            # same nearest control point, and applying each of their shifts
+            # separately would stack well past max_shift, flinging that
+            # point far from its neighbors and folding the control polygon
+            # (and hence the curve) into a loop. Keep only the largest shift
+            # requested for each point instead.
+            pending = {}
             for s in np.linspace(0.0, 1.0, n_curve_samples):
                 sample_pos = traj.position(s * self.duration)
                 dist, direction = self._nearest_obstacle(sample_pos)
                 if dist < self.safe_distance and direction is not None:
                     idx = 1 + int(np.argmin(np.linalg.norm(interior - sample_pos, axis=1)))
                     shift = min(self.gain * (self.safe_distance - dist), self.max_shift)
-                    # obstacle lies `direction` away from the sample, so move
-                    # the nearest control point the opposite way to clear it.
-                    points[idx] = points[idx] - direction * shift
-                    interior = points[1:-1]
-                    moved = True
-            if not moved:
+                    prev = pending.get(idx)
+                    if prev is None or shift > prev[1]:
+                        pending[idx] = (direction, shift)
+            if not pending:
                 break
+            # obstacle lies `direction` away from the sample, so move the
+            # nearest control point the opposite way to clear it.
+            for idx, (direction, shift) in pending.items():
+                points[idx] = points[idx] - direction * shift
             traj = BSplineTrajectory(points, duration=self.duration, degree=self.degree)
 
         self.adjusted_waypoints = points
@@ -184,6 +193,7 @@ class ReactiveReplanner:
                  max_shift: float = config.MAX_PERTURB_SHIFT,
                  max_iters: int = config.MAX_PLANNER_ITERS,
                  degree: int = config.BSPLINE_DEGREE,
+                 replan_speed_factor: float = config.REPLAN_SPEED_FACTOR,
                  probe_directions: np.ndarray = None):
         self.waypoints = np.asarray(waypoints, dtype=float)
         self.obstacle_distance_fn = obstacle_distance_fn
@@ -196,6 +206,7 @@ class ReactiveReplanner:
         self.max_shift = max_shift
         self.max_iters = max_iters
         self.degree = degree
+        self.replan_speed_factor = replan_speed_factor
         self.probe_directions = (
             probe_directions if probe_directions is not None else DEFAULT_PROBE_DIRECTIONS
         )
@@ -210,6 +221,11 @@ class ReactiveReplanner:
         self._segment_start_t = 0.0
         self.adjusted_waypoints = self.waypoints.copy()
 
+        # Nominal cruise speed of the calm, unobstructed flight -- the
+        # baseline a reactive replan's slower segment speed is defined
+        # relative to (see REPLAN_SPEED_FACTOR / maybe_replan below).
+        self.nominal_speed = self._segment_traj.total_length / self.duration
+
         self._armed = True  # True == currently outside rearm_range (can trigger again)
         self._last_replan_t = -np.inf
         self.replan_count = 0
@@ -222,12 +238,27 @@ class ReactiveReplanner:
                 best = dist
         return best
 
-    def maybe_replan(self, t: float, current_pos: np.ndarray) -> bool:
+    def maybe_replan(self, t: float, current_pos: np.ndarray, current_vel: np.ndarray = None) -> bool:
         """
         Call once per sim step with the current time and the drone's actual
-        position. Replans the remaining route in place the moment an
-        obstacle is newly detected within ``detection_range``. Returns True
-        iff a replan happened, so callers (e.g. the viewer) know to redraw.
+        position (and, ideally, velocity -- see below). Replans the
+        remaining route in place the moment an obstacle is newly detected
+        within ``detection_range``. Returns True iff a replan happened, so
+        callers (e.g. the viewer) know to redraw.
+
+        ``current_vel``, if given, seeds the new segment's initial control
+        polygon with an extra point placed along the drone's actual
+        velocity direction, so the freshly built curve's initial tangent
+        continues roughly where the drone is already headed instead of
+        jumping straight at the next original waypoint regardless of which
+        way the drone is currently moving. Skipping this produces a large
+        instantaneous jump in commanded velocity right at the replan
+        instant -- verified in simulation to cause a hard brake/redirect
+        that overshoots past the newly planned curve and, at close
+        detection ranges, straight through the obstacle it was meant to
+        avoid (the vehicle's own momentum doesn't respect the new
+        setpoint). Optional only for callers that genuinely can't supply a
+        velocity estimate; always pass it when available.
         """
         if t >= self.duration - 1e-6:
             return False
@@ -243,11 +274,17 @@ class ReactiveReplanner:
 
         k = int(np.searchsorted(self._nominal_arrival, t, side="right"))
         k = int(np.clip(k, 1, self.waypoints.shape[0] - 1))
-        remaining = np.vstack([current_pos, self.waypoints[k:]])
+        remaining_duration = max(self.duration - t, 1e-3)
+
+        anchor_points = [current_pos]
+        if current_vel is not None and np.linalg.norm(current_vel) > 1e-3:
+            blend_dt = min(0.4, remaining_duration * 0.15)
+            anchor_points.append(current_pos + current_vel * blend_dt)
+        anchor_points.append(self.waypoints[k:])
+        remaining = np.vstack(anchor_points)
         if remaining.shape[0] < 2:
             return False
 
-        remaining_duration = max(self.duration - t, 1e-3)
         segment_planner = AdaptiveBSplinePlanner(
             remaining,
             obstacle_distance_fn=self.obstacle_distance_fn,
@@ -258,11 +295,34 @@ class ReactiveReplanner:
             duration=remaining_duration,
             degree=self.degree,
         )
-        self._segment_traj = segment_planner.plan()
+        raw_traj = segment_planner.plan()
+
+        # Slow down for the maneuver itself: flown at the untouched cruise
+        # speed, the sharp bend a close-range avoidance curve makes right
+        # where the drone already is demands a sudden burst of lateral
+        # acceleration -- exactly what reads as a hard jerk to the side.
+        # Geometric arc length doesn't depend on the duration a
+        # BSplineTrajectory is built with (see bspline.py), so `raw_traj`
+        # already has the real detour distance; retarget the segment's
+        # duration off that distance at the slower speed and rebuild.
+        # `max(..., remaining_duration)` means this only ever slows the
+        # segment down relative to the nominal schedule, never speeds it up
+        # (e.g. if the perturbation barely lengthened the path).
+        slow_duration = max(
+            raw_traj.total_length / (self.nominal_speed * self.replan_speed_factor),
+            remaining_duration,
+        )
+        self._segment_traj = BSplineTrajectory(
+            segment_planner.adjusted_waypoints, duration=slow_duration, degree=self.degree,
+        )
         self._segment_start_t = t
         self.adjusted_waypoints = segment_planner.adjusted_waypoints
         self._last_replan_t = t
         self.replan_count += 1
+        # The slowed-down segment may now finish later than the original
+        # schedule -- stretch the overall flight duration to match so
+        # callers (sim loops, viewers) don't cut the flight off early.
+        self.duration = max(self.duration, t + slow_duration)
         return True
 
     def _local_t(self, t: float) -> float:

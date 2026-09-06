@@ -48,7 +48,6 @@ def run(use_viewer: bool = False):
     mujoco.mj_forward(model, data)
 
     planner, traj, pos_ctrl, attitude_ctrl, mixer, obstacle_distance_fn = build_pipeline(model, data)
-    duration = traj.duration
     logger = FlightLogger()
     imu, estimator = build_imu_and_estimator(model, data)
 
@@ -59,9 +58,12 @@ def run(use_viewer: bool = False):
         draw_planned_scene(viewer_ctx, planner)
         frame_camera(viewer_ctx, model, data, planner)
 
-    n_steps = int(duration / model.opt.timestep)
+    # planner.duration can grow mid-flight -- a reactive replan that slows
+    # the drone down for an avoidance maneuver (see ReactiveReplanner)
+    # pushes the flight's finish time later, so re-check it every step
+    # rather than computing a fixed step count from the pre-replan value.
     wall_start = time.time()
-    for step in range(n_steps):
+    while data.time < planner.duration:
         t = data.time
         pos = data.qpos[0:3].copy()
         vel = data.qvel[0:3].copy()
@@ -69,7 +71,7 @@ def run(use_viewer: bool = False):
         accel_meas, gyro_meas = imu.read()
         q_est = estimator.update(accel_meas, gyro_meas, model.opt.timestep)
 
-        if planner.maybe_replan(t, pos):
+        if planner.maybe_replan(t, pos, vel):
             print(f"[t={t:.2f}s] Obstacle detected -- replanned remaining route "
                   f"({planner.replan_count} replan(s) so far)")
             if viewer_ctx is not None:

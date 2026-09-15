@@ -60,18 +60,19 @@ MAX_PLANNER_ITERS = 8
 # actually matters physically is body-surface-to-obstacle-surface
 # clearance at the moment of detection, not the sensor's raw
 # center-to-obstacle reading. TRIGGER_BODY_CLEARANCE below is that
-# clearance. It is NOT a free "closer feels more realistic" knob --
-# full-physics closed-loop simulation (real Stage 3 ray sensor, Stage 1/2
-# control loops, MuJoCo dynamics) shows a hard collision cliff just below
-# 0.24m: at 0.22m body clearance the drone still clips the obstacle by
-# ~4cm, and it gets worse fast the closer the trigger gets (5cm trigger ->
-# ~11.5cm penetration) simply because there isn't enough distance left, at
-# this vehicle's flight speed, for a replan + control response to change
-# the flight path before momentum carries it into the obstacle. 0.30m
-# clears that cliff with a verified ~13cm of spare body clearance -- close
-# enough to read as "reacting right at the obstacle" rather than meters
-# out, without being fragile to small perturbations. See adaptive_planner.py.
-TRIGGER_BODY_CLEARANCE = 0.30  # m, verified collision-free via simulation sweep
+# clearance. Going smaller is NOT a free "closer feels more realistic"
+# knob -- full-physics closed-loop simulation (real Stage 3 ray sensor,
+# Stage 1/2 control loops, MuJoCo dynamics) shows a hard collision cliff
+# just below 0.24m: at 0.22m body clearance the drone still clips the
+# obstacle by ~4cm, and it gets worse fast the closer the trigger gets
+# (5cm trigger -> ~11.5cm penetration) simply because there isn't enough
+# distance left, at this vehicle's flight speed, for a replan + control
+# response to change the flight path before momentum carries it into the
+# obstacle. 0.30m was the previous, tighter value (verified collision-free
+# with ~13cm of spare body clearance); 0.50m widens that margin further so
+# avoidance kicks in noticeably earlier/farther out, well clear of the
+# collision cliff. See adaptive_planner.py.
+TRIGGER_BODY_CLEARANCE = 0.50  # m, body-surface clearance at detection trigger
 DETECTION_RANGE = DRONE_RADIUS + TRIGGER_BODY_CLEARANCE
 
 # ReactiveReplanner re-arms (becomes eligible to trigger another replan)

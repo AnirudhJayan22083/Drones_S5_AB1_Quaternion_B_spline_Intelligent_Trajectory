@@ -118,8 +118,11 @@ stage1_dynamics_attitude/       Quadrotor dynamics, quaternion attitude control,
 stage2_trajectory_planning/     B-spline trajectory generation, adaptive replanning, position control
 stage3_sensing_environment/     Simulated IR obstacle sensing
 stage4_logging_integration/     Full pipeline integration, logging, and live/headless visualization
+stage5_pybullet_sim/            PyBullet physics backend & co-simulation
+stage6_ardupilot_sim/           ArduPilot SITL integration & offboard MAVLink setpoint streaming
 models/                         MuJoCo XML model(s)
 outputs/                        Generated plots from each stage's demo scripts
+
 ```
 
 ---

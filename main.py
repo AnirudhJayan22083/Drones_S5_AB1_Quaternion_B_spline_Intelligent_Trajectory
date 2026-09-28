@@ -28,6 +28,8 @@ from stage1_dynamics_attitude.run_hover_demo import run as run_stage1
 from stage2_trajectory_planning.run_trajectory_demo import run as run_stage2
 from stage3_sensing_environment.run_sensor_demo import run_demo as run_stage3
 from stage4_logging_integration.run_full_demo import run as run_stage4
+from stage5_pybullet_sim.run_pybullet_demo import run as run_stage5
+from stage6_ardupilot_sim.run_ardupilot_demo import run as run_stage6
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(REPO_ROOT, "outputs")
@@ -37,7 +39,10 @@ STAGES = [
     ("Stage 2 (trajectory planning)", "stage2_trajectory_tracking.png", run_stage2),
     ("Stage 3 (sensing & environment)", "stage3_sensor_demo.png", run_stage3),
     ("Stage 4 (full integration)", "stage4_full_integration.png", run_stage4),
+    ("Stage 5 (PyBullet simulation)", "stage5_pybullet_tracking.png", run_stage5),
+    ("Stage 6 (ArduPilot SITL integration)", "stage6_ardupilot_tracking.png", run_stage6),
 ]
+
 
 
 def main():

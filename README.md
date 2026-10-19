@@ -327,7 +327,9 @@ All results below are produced by the repository's own demo scripts
 
 | Stage | Scenario | Final error | Mean error | Max error |
 |---|---|---|---|---|
-| 4 — Full Integration | B-spline route with 2 obstacles, live IR sensing + reactive replanning | 0.240 m | 0.622 m | 2.037 m |
+| 4 — Full Integration (MuJoCo) | B-spline route with 2 obstacles, live IR sensing + reactive replanning | 0.533 m | 0.313 m | 0.533 m |
+| 5 — PyBullet Verification | Identical B-spline route & obstacles in PyBullet physics engine | 0.556 m | 0.322 m | 0.556 m |
+| 6 — ArduPilot SITL Integration | GUIDED MAVLink setpoint tracking with live proximity sensing & replanning | 0.016 m | 0.044 m | 0.322 m |
 
 ### Table 2 — Adaptive Obstacle Avoidance (Stage 4)
 

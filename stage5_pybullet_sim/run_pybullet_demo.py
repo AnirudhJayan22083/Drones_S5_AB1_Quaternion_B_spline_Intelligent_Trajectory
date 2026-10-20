@@ -159,7 +159,9 @@ def save_plot(logger: FlightLogger):
 
     fig.tight_layout()
     out_path = os.path.join(OUTPUT_DIR, "stage5_pybullet_integration.png")
+    out_tracking = os.path.join(OUTPUT_DIR, "stage5_pybullet_tracking.png")
     fig.savefig(out_path, dpi=150)
+    fig.savefig(out_tracking, dpi=150)
     print(f"Saved integration plot to {out_path}")
 
 

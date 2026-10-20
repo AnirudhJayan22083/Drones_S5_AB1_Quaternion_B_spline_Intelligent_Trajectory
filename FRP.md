@@ -12,16 +12,17 @@ The framework features an online adaptive trajectory layer that reactively pertu
 
 ## Repository Architecture & Stage Breakdown
 
-The project repository is structured into five modular stages:
+The project repository is structured into six modular stages:
 
 | Stage Folder | Core Module / Purpose | Key Features |
 |---|---|---|
-| [`stage1_dynamics_attitude`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/stage1_dynamics_attitude) | Quadrotor Dynamics & Attitude Control | Rigid-body dynamics, unit quaternion kinematics, Lyapunov nonlinear attitude control with gyroscopic feedforward, Mahony IMU attitude estimation filter, motor mixing for "+"-configuration. |
-| [`stage2_trajectory_planning`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/stage2_trajectory_planning) | B-Spline Generation & Position Control | Cox–de Boor cubic B-spline evaluation, differential flatness position controller, Shepperd's rotation matrix extraction, `ReactiveReplanner` control-point perturbation. |
-| [`stage3_sensing_environment`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/stage3_sensing_environment) | Sensing & Environment Simulation | Simulated IR ray-cast distance sensor with range limits and measurement noise, IMU sensor simulation (gyroscope + accelerometer with bias drift). |
-| [`stage4_logging_integration`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/stage4_logging_integration) | Pipeline Integration & Logging | End-to-end closed-loop navigation pipeline in MuJoCo, CSV telemetry logger (`FlightLogger`), batch plot generation, live 3D visualization. |
-| [`stage5_pybullet_sim`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/stage5_pybullet_sim) | PyBullet Simulation Engine | Multi-engine physics verification using PyBullet backend (`pybullet_backend.py`), cross-platform trajectory tracking validation. |
-| [`models`](file:///c:/Users/BHARATH/OneDrive/Desktop/drones-ananth/Drones_S5_AB1_Quaternion_B_spline_Intelligent_Trajectory/models) | XML Physics Models | High-fidelity MuJoCo quadrotor XML definition (`quadrotor.xml`) with physical inertia, motor geometry, and actuator constraints. |
+| [`stage1_dynamics_attitude`](stage1_dynamics_attitude) | Quadrotor Dynamics & Attitude Control | Rigid-body dynamics, unit quaternion kinematics, Lyapunov nonlinear attitude control with gyroscopic feedforward, Mahony IMU attitude estimation filter, motor mixing for "+"-configuration. |
+| [`stage2_trajectory_planning`](stage2_trajectory_planning) | B-Spline Generation & Position Control | Cox–de Boor cubic B-spline evaluation, differential flatness position controller, Shepperd's rotation matrix extraction, `ReactiveReplanner` control-point perturbation. |
+| [`stage3_sensing_environment`](stage3_sensing_environment) | Sensing & Environment Simulation | Simulated IR ray-cast distance sensor with range limits and measurement noise, IMU sensor simulation (gyroscope + accelerometer with bias drift). |
+| [`stage4_logging_integration`](stage4_logging_integration) | Pipeline Integration & Logging | End-to-end closed-loop navigation pipeline in MuJoCo, CSV telemetry logger (`FlightLogger`), batch plot generation, live 3D visualization. |
+| [`stage5_pybullet_sim`](stage5_pybullet_sim) | PyBullet Simulation Engine | Multi-engine physics verification using PyBullet backend (`pybullet_backend.py`), cross-platform trajectory tracking validation. |
+| [`stage6_ardupilot_sim`](stage6_ardupilot_sim) | ArduPilot SITL & MAVLink Integration | Offboard GUIDED setpoint streaming, online proximity sensing, reactive B-spline replanning, and EKF telemetry validation. |
+| [`models`](models) | XML Physics Models | High-fidelity MuJoCo quadrotor XML definition (`quadrotor.xml`) with physical inertia, motor geometry, and actuator constraints. |
 
 ---
 

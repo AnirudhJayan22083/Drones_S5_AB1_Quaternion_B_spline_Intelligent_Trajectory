@@ -118,8 +118,11 @@ stage1_dynamics_attitude/       Quadrotor dynamics, quaternion attitude control,
 stage2_trajectory_planning/     B-spline trajectory generation, adaptive replanning, position control
 stage3_sensing_environment/     Simulated IR obstacle sensing
 stage4_logging_integration/     Full pipeline integration, logging, and live/headless visualization
+stage5_pybullet_sim/            PyBullet physics backend & co-simulation
+stage6_ardupilot_sim/           ArduPilot SITL integration & offboard MAVLink setpoint streaming
 models/                         MuJoCo XML model(s)
 outputs/                        Generated plots from each stage's demo scripts
+
 ```
 
 ---
@@ -324,7 +327,9 @@ All results below are produced by the repository's own demo scripts
 
 | Stage | Scenario | Final error | Mean error | Max error |
 |---|---|---|---|---|
-| 4 — Full Integration | B-spline route with 2 obstacles, live IR sensing + reactive replanning | 0.240 m | 0.622 m | 2.037 m |
+| 4 — Full Integration (MuJoCo) | B-spline route with 2 obstacles, live IR sensing + reactive replanning | 0.533 m | 0.313 m | 0.533 m |
+| 5 — PyBullet Verification | Identical B-spline route & obstacles in PyBullet physics engine | 0.556 m | 0.322 m | 0.556 m |
+| 6 — ArduPilot SITL Integration | GUIDED MAVLink setpoint tracking with live proximity sensing & replanning | 0.016 m | 0.044 m | 0.322 m |
 
 ### Table 2 — Adaptive Obstacle Avoidance (Stage 4)
 

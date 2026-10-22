@@ -120,10 +120,35 @@ stage3_sensing_environment/     Simulated IR obstacle sensing
 stage4_logging_integration/     Full pipeline integration, logging, and live/headless visualization
 stage5_pybullet_sim/            PyBullet physics backend & co-simulation
 stage6_ardupilot_sim/           ArduPilot SITL integration & offboard MAVLink setpoint streaming
+stage7_gazebo_sim/              Gazebo (gz-sim) physics backend, lockstep in-process co-simulation
 models/                         MuJoCo XML model(s)
 outputs/                        Generated plots from each stage's demo scripts
 
 ```
+
+### Running Stage 7 (Gazebo)
+
+Stage 7 flies the same Stage 1–3 stack and route as Stages 4 and 5 in Gazebo
+(gz-sim Harmonic or newer). The controller runs inside gz-sim's PreUpdate callback
+through the Python `TestFixture`, so it steps in lockstep with Gazebo's physics.
+The Gazebo Python bindings are not on pip, and Gazebo has no stable Windows build,
+so on Windows run Stage 7 inside WSL2 (Ubuntu 24.04):
+
+```bash
+sudo apt-get update && sudo apt-get install -y curl lsb-release gnupg
+sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+sudo apt-get update && sudo apt-get install -y gz-harmonic python3-gz-sim8 python3-gz-math7 python3-venv
+
+# --system-site-packages so the venv can see the apt-installed gz bindings
+python3 -m venv --system-site-packages .venv && source .venv/bin/activate
+pip install mujoco numpy matplotlib pymavlink
+
+python -m stage7_gazebo_sim.run_gazebo_demo             # headless, saves outputs/stage7_gazebo_*.png
+python -m stage7_gazebo_sim.run_gazebo_demo --viewer    # real time, opens the Gazebo GUI
+```
+
+`main.py` skips Stage 5 or Stage 7 (with a message) when PyBullet or Gazebo isn't installed.
 
 ---
 

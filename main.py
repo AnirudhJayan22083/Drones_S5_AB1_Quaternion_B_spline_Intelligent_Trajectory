@@ -18,6 +18,7 @@ Usage:
 """
 
 import argparse
+import importlib
 import os
 
 import matplotlib
@@ -28,19 +29,35 @@ from stage1_dynamics_attitude.run_hover_demo import run as run_stage1
 from stage2_trajectory_planning.run_trajectory_demo import run as run_stage2
 from stage3_sensing_environment.run_sensor_demo import run_demo as run_stage3
 from stage4_logging_integration.run_full_demo import run as run_stage4
-from stage5_pybullet_sim.run_pybullet_demo import run as run_stage5
 from stage6_ardupilot_sim.run_ardupilot_demo import run as run_stage6
+
+
+def _optional_stage(module_name: str):
+    """
+    Import a stage whose simulator is an optional install (PyBullet,
+    Gazebo) -- returns (run_fn, None), or (None, reason) if its dependency
+    is missing, so one absent simulator doesn't stop every other stage.
+    """
+    try:
+        return importlib.import_module(module_name).run, None
+    except ImportError as err:
+        return None, str(err)
+
+
+run_stage5, stage5_missing = _optional_stage("stage5_pybullet_sim.run_pybullet_demo")
+run_stage7, stage7_missing = _optional_stage("stage7_gazebo_sim.run_gazebo_demo")
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(REPO_ROOT, "outputs")
 
 STAGES = [
-    ("Stage 1 (dynamics & attitude)", "stage1_hover_tracking.png", run_stage1),
-    ("Stage 2 (trajectory planning)", "stage2_trajectory_tracking.png", run_stage2),
-    ("Stage 3 (sensing & environment)", "stage3_sensor_demo.png", run_stage3),
-    ("Stage 4 (full integration)", "stage4_full_integration.png", run_stage4),
-    ("Stage 5 (PyBullet simulation)", "stage5_pybullet_tracking.png", run_stage5),
-    ("Stage 6 (ArduPilot SITL integration)", "stage6_ardupilot_tracking.png", run_stage6),
+    ("Stage 1 (dynamics & attitude)", "stage1_hover_tracking.png", run_stage1, None),
+    ("Stage 2 (trajectory planning)", "stage2_trajectory_tracking.png", run_stage2, None),
+    ("Stage 3 (sensing & environment)", "stage3_sensor_demo.png", run_stage3, None),
+    ("Stage 4 (full integration)", "stage4_full_integration.png", run_stage4, None),
+    ("Stage 5 (PyBullet simulation)", "stage5_pybullet_tracking.png", run_stage5, stage5_missing),
+    ("Stage 6 (ArduPilot SITL integration)", "stage6_ardupilot_tracking.png", run_stage6, None),
+    ("Stage 7 (Gazebo simulation)", "stage7_gazebo_tracking.png", run_stage7, stage7_missing),
 ]
 
 
@@ -53,9 +70,12 @@ def main():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    for label, filename, run_fn in STAGES:
+    for label, filename, run_fn, missing_reason in STAGES:
         out_path = os.path.join(OUTPUT_DIR, filename)
         print(f"\n=== {label} ===")
+        if run_fn is None:
+            print(f"Skipping -- simulator not installed: {missing_reason}")
+            continue
         if os.path.exists(out_path) and not args.force:
             print(f"Skipping -- {filename} already exists (use --force to regenerate).")
             continue

@@ -384,7 +384,12 @@ x_k=\begin{bmatrix} \zeta_{j,k}\\ \dot\zeta_{j,k}\end{bmatrix},
 A_{\text{phys}}=\begin{bmatrix}1 & \Delta t\\ 0 & 1\end{bmatrix},\quad
 B_{\text{phys}}=\begin{bmatrix}\Delta t^2/(2m)\\ \Delta t/m\end{bmatrix}.
 $$
-
+$$
+x_k=\begin{bmatrix} \zeta_{j,k}\cr \dot\zeta_{j,k}\end{bmatrix},
+\qquad
+A_{\text{phys}}=\begin{bmatrix}1 & \Delta t\cr 0 & 1\end{bmatrix},\quad
+B_{\text{phys}}=\begin{bmatrix}\Delta t^2/(2m)\cr \Delta t/m\end{bmatrix}.
+$$
 #### 5.3 Least-Squares Estimation
 
 For either loop, gather the unknowns into $\Theta=[A\;B]$ so the model is linear in the

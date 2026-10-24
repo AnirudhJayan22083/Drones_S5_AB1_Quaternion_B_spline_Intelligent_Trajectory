@@ -9,7 +9,7 @@
 | Anirudh Jayan | CB.SC.U4AIE24007 | cb.sc.u4aie24007@cb.students.amrita.edu |
 | Anantha Krishna S K | CB.SC.U4AIE24102 | cb.sc.u4aie24102@cb.students.amrita.edu |
 | Aravind S Harilal | CB.SC.U4AIE24008 | cb.sc.u4aie24008@cb.students.amrita.edu |
-| Yaswanth Reddy | CB.SC.U4AIE24061 | cb.sc.u4aie24061@cb.students.amrita.edu |
+| Yaswant Reddy | CB.SC.U4AIE24061 | cb.sc.u4aie24061@cb.students.amrita.edu |
 
 ---
 
@@ -171,10 +171,11 @@ clamped, uniform knot vector $U=\lbrace u_0,\dots,u_m\rbrace$ is evaluated via t
 Cox–de Boor recursion:
 
 ```math
-N_{i,0}(u) = \begin{cases} 1 & u_i \le u < u_{i+1} \\ 0 & \text{otherwise} \end{cases}
+N_{i,0}(u) = \begin{cases} 1 & u_i \le u < u_{i+1} \\[6pt] 0 & \text{otherwise} \end{cases}
 ```
+
 ```math
-N_{i,p}(u) = \left(\frac{u-u_i}{u_{i+p}-u_i}\right)\,N_{i,p-1}(u) + \left(\frac{u_{i+p+1}-u}{u_{i+p+1}-u_{i+1}}\right)\,N_{i+1,p-1}(u)
+N_{i,p}(u) = \frac{u-u_i}{u_{i+p}-u_i}\,N_{i,p-1}(u) + \frac{u_{i+p+1}-u}{u_{i+p+1}-u_{i+1}}\,N_{i+1,p-1}(u)
 ```
 
 ```math
@@ -198,7 +199,11 @@ piecewise-linear waypoint interpolation. Wall-clock time is mapped to the curve 
 by $u(t)=\mathrm{clip}(t/T_{\text{dur}},0,1)$, so
 
 ```math
-r_{des}(t) = C(u(t)), \qquad v_{des}(t) = \frac{1}{T_{\text{dur}}}\,C'(u(t)), \qquad \ddot r_{des}(t) = \frac{1}{T_{\text{dur}}^2}\,C''(u(t)).
+\begin{aligned}
+r_{des}(t) &= C(u(t)) \\[8pt]
+v_{des}(t) &= \frac{1}{T_{\text{dur}}}\,C'(u(t)) \\[8pt]
+\ddot r_{des}(t) &= \frac{1}{T_{\text{dur}}^2}\,C''(u(t))
+\end{aligned}
 ```
 
 ### 2. Quaternion Estimation
@@ -214,7 +219,7 @@ specific-force reading. The IMU sample rate is 100 Hz, so $\Delta t = 0.01\,\mat
 **Gyro propagation.** From quaternion kinematics, the quaternion rate is
 
 ```math
-\dot q = \tfrac{1}{2}\, q_k \otimes \begin{bmatrix} 0 \\ \omega_{gyro} \end{bmatrix}
+\dot q = \tfrac{1}{2}\, q_k \otimes \begin{bmatrix} 0 \\[6pt] \omega_{gyro} \end{bmatrix}
 ```
 
 with $\otimes$ the Hamilton product implemented in
@@ -222,7 +227,10 @@ with $\otimes$ the Hamilton product implemented in
 one step and renormalising to keep a unit quaternion gives the propagated estimate
 
 ```math
-q_{k+1} = q_k + \dot q\,\Delta t, \qquad q_{k+1} \leftarrow \mathrm{normalize}(q_{k+1})
+\begin{aligned}
+q_{k+1} &= q_k + \dot q\,\Delta t \\[8pt]
+q_{k+1} &\leftarrow \mathrm{normalize}(q_{k+1})
+\end{aligned}
 ```
 
 Gyro integration alone drifts, so the accelerometer reading is used to correct the drift
@@ -233,7 +241,10 @@ is found by comparing $a$ with the direction gravity *should* point in the body 
 given the current estimate $q_k$:
 
 ```math
-\hat g = q_k^{-1} \otimes (0,0,0,1) \otimes q_k, \qquad e = \hat g \times a
+\begin{aligned}
+\hat g &= q_k^{-1} \otimes (0,0,0,1) \otimes q_k \\[8pt]
+e &= \hat g \times a
+\end{aligned}
 ```
 
 This error corrects the gyro reading before integration. It enters both as an immediate
@@ -251,7 +262,10 @@ accumulated over time. The final estimate uses this corrected rate in place of t
 gyro reading:
 
 ```math
-\dot q_c = \tfrac{1}{2}\, q_k \otimes \begin{bmatrix} 0 \\ \omega_c \end{bmatrix}, \qquad q_{k+1} = q_k + \dot q_c\,\Delta t
+\begin{aligned}
+\dot q_c &= \tfrac{1}{2}\, q_k \otimes \begin{bmatrix} 0 \\[4pt] \omega_c \end{bmatrix} \\[8pt]
+q_{k+1} &= q_k + \dot q_c\,\Delta t
+\end{aligned}
 ```
 
 Only gravity is observed, not magnetic north, so roll and pitch are fully corrected while
@@ -265,7 +279,7 @@ simulated IMU noise and bias from
 **State representation.** The full state of the drone is
 
 ```math
-x = \begin{bmatrix} r \\ v \\ \Omega \\ q \end{bmatrix}
+x = \begin{bmatrix} r \\[6pt] v \\[6pt] \Omega \\[6pt] q \end{bmatrix}
 ```
 
 where $r$ is the position vector, $v$ is the linear velocity vector, $\Omega$ is the
@@ -332,7 +346,11 @@ Trajectory  ──►  Error calculation  ──►  PD controller  ──►  C
 **Position and velocity errors.**
 
 ```math
-e_{pos} = r_{des} - r, \qquad e_{vel} = v_{des} - v, \qquad \dot e_{pos} = e_{vel}
+\begin{aligned}
+e_{pos} &= r_{des} - r \\[8pt]
+e_{vel} &= v_{des} - v \\[8pt]
+\dot e_{pos} &= e_{vel}
+\end{aligned}
 ```
 
 Here $r_{des}$ and $v_{des}$ come from the B-spline planner, and $r$ and $v$ are the
@@ -347,7 +365,10 @@ desired velocity, reduces overshoot, and damps excessive motion, and $K_d$ sets 
 strength.
 
 ```math
-F_P = K_p\, e_{pos}, \qquad F_D = K_d\, e_{vel}
+\begin{aligned}
+F_P &= K_p\, e_{pos} \\[8pt]
+F_D &= K_d\, e_{vel}
+\end{aligned}
 ```
 
 **Complete control law.** The commanded acceleration combines a feedforward term from the
@@ -367,7 +388,10 @@ $\ddot e_{pos} = \ddot r_{des} - \ddot r$. Assuming the attitude loop delivers t
 commanded acceleration ($\ddot r = \ddot r_{cmd}$), the desired-acceleration terms cancel:
 
 ```math
-\ddot e_{pos} = \ddot r_{des} - \left[ \ddot r_{des} + \frac{1}{m}\left( K_p\, e_{pos} + K_d\, e_{vel} \right) \right] = -\frac{1}{m} \left( K_p\, e_{pos} + K_d\, e_{vel} \right)
+\begin{aligned}
+\ddot e_{pos} &= \ddot r_{des} - \left[ \ddot r_{des} + \frac{1}{m}\left( K_p\, e_{pos} + K_d\, e_{vel} \right) \right] \\[8pt]
+&= -\frac{1}{m} \left( K_p\, e_{pos} + K_d\, e_{vel} \right)
+\end{aligned}
 ```
 
 This equation describes the closed-loop evolution of the tracking error. With positive
@@ -378,7 +402,10 @@ $\omega_n=\sqrt{K_p/m}$ and damping ratio $\zeta=K_d/(2\sqrt{mK_p})$.
 variable:
 
 ```math
-u_k = K_p\, e_{pos,k} + K_d\, e_{vel,k}, \qquad \ddot e_{pos,k} = -\frac{1}{m}\, u_k
+\begin{aligned}
+u_k &= K_p\, e_{pos,k} + K_d\, e_{vel,k} \\[8pt]
+\ddot e_{pos,k} &= -\frac{1}{m}\, u_k
+\end{aligned}
 ```
 
 **Discretisation of the error dynamics.** A digital controller runs at discrete time
@@ -402,7 +429,7 @@ current input $u_k$ held for that interval.
 into the standard form $z_{k+1} = A z_k + B u_k$:
 
 ```math
-\underbrace{\begin{bmatrix} e_{pos,k+1} \\ e_{vel,k+1} \end{bmatrix}}_{z_{k+1}} = \underbrace{\begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}}_{A} \underbrace{\begin{bmatrix} e_{pos,k} \\ e_{vel,k} \end{bmatrix}}_{z_k} + \underbrace{\begin{bmatrix} -\frac{\Delta t^2}{2m} \\ -\frac{\Delta t}{m} \end{bmatrix}}_{B} u_k
+\underbrace{\begin{bmatrix} e_{pos,k+1} \\[6pt] e_{vel,k+1} \end{bmatrix}}_{z_{k+1}} = \underbrace{\begin{bmatrix} 1 & \Delta t \\[6pt] 0 & 1 \end{bmatrix}}_{A}\, \underbrace{\begin{bmatrix} e_{pos,k} \\[6pt] e_{vel,k} \end{bmatrix}}_{z_k} \;+\; \underbrace{\begin{bmatrix} -\dfrac{\Delta t^2}{2m} \\[12pt] -\dfrac{\Delta t}{m} \end{bmatrix}}_{B} u_k
 ```
 
 $A$ describes how the current error state evolves to the next state, $B$ describes how the
@@ -412,7 +439,7 @@ drone, $z_k$ holds the three position-error components followed by the three
 velocity-error components (6 elements), $u_k$ has 3 elements, and
 
 ```math
-A = \begin{bmatrix} I_3 & \Delta t\, I_3 \\ 0 & I_3 \end{bmatrix}, \qquad B = \begin{bmatrix} -\frac{\Delta t^2}{2m}\, I_3 \\ -\frac{\Delta t}{m}\, I_3 \end{bmatrix}
+A = \begin{bmatrix} I_3 & \Delta t\, I_3 \\[6pt] 0 & I_3 \end{bmatrix}, \qquad\quad B = \begin{bmatrix} -\dfrac{\Delta t^2}{2m}\, I_3 \\[12pt] -\dfrac{\Delta t}{m}\, I_3 \end{bmatrix}
 ```
 
 where $I_3$ is the $3\times 3$ identity matrix.
@@ -421,7 +448,10 @@ where $I_3$ is the $3\times 3$ identity matrix.
 the commanded acceleration gives the desired total force:
 
 ```math
-F_{d,k} = m\left( \ddot r_{cmd,k} + g\,e_3 \right) = m g\, e_3 + m\,\ddot r_{des,k} + u_k
+\begin{aligned}
+F_{d,k} &= m\left( \ddot r_{cmd,k} + g\,e_3 \right) \\[8pt]
+&= m g\, e_3 + m\,\ddot r_{des,k} + u_k
+\end{aligned}
 ```
 
 The underactuated quadrotor can apply thrust only along its own body $z$ axis, so the
@@ -435,7 +465,12 @@ and the desired attitude is recovered from the force direction together with a d
 heading $\psi_d$:
 
 ```math
-z_b = \frac{F_{d,k}}{T_k}, \qquad x_{yaw} = \begin{bmatrix} \cos\psi_d \\ \sin\psi_d \\ 0 \end{bmatrix}, \qquad y_b = \frac{z_b \times x_{yaw}}{\lVert z_b \times x_{yaw} \rVert}, \qquad x_b = y_b \times z_b
+\begin{aligned}
+z_b &= \frac{F_{d,k}}{T_k} \\[8pt]
+x_{yaw} &= \begin{bmatrix} \cos\psi_d \\[4pt] \sin\psi_d \\[4pt] 0 \end{bmatrix} \\[8pt]
+y_b &= \frac{z_b \times x_{yaw}}{\lVert z_b \times x_{yaw} \rVert} \\[8pt]
+x_b &= y_b \times z_b
+\end{aligned}
 ```
 
 $x_{yaw}$ is the horizontal reference direction that encodes the heading. The desired
@@ -453,7 +488,10 @@ $q_c$, with angular velocity $\Omega$, to the desired orientation $q_{des}$ from
 **Attitude error.**
 
 ```math
-q_e = q_{des}^{-1} \otimes q_c, \qquad \Omega_e = \Omega - \Omega_{des}
+\begin{aligned}
+q_e &= q_{des}^{-1} \otimes q_c \\[8pt]
+\Omega_e &= \Omega - \Omega_{des}
+\end{aligned}
 ```
 
 $q_e$ is the rotation remaining between the desired and the current attitude; if
@@ -465,7 +503,7 @@ corrects along the shorter rotation.
 $\phi$,
 
 ```math
-q_e \approx \begin{bmatrix} 1 \\ \phi/2 \end{bmatrix}
+q_e \approx \begin{bmatrix} 1 \\[6pt] \phi/2 \end{bmatrix}
 ```
 
 so the vector part of the error quaternion is half the attitude-error angle.
@@ -523,13 +561,16 @@ $\ddot{\vec q}_e \approx u_k/(2J_{xx})$):
 ```
 
 ```math
-\Omega_{e,k+1} = \Omega_{e,k} + \Delta t\,\dot\Omega_{e,k} = \Omega_{e,k} + \frac{\Delta t}{J_{xx}}\, u_k
+\begin{aligned}
+\Omega_{e,k+1} &= \Omega_{e,k} + \Delta t\,\dot\Omega_{e,k} \\[8pt]
+&= \Omega_{e,k} + \frac{\Delta t}{J_{xx}}\, u_k
+\end{aligned}
 ```
 
 **State-space representation.**
 
 ```math
-\underbrace{\begin{bmatrix} \vec q_{e,k+1} \\ \Omega_{e,k+1} \end{bmatrix}}_{x_{k+1}} = \underbrace{\begin{bmatrix} 1 & \frac{\Delta t}{2} \\ 0 & 1 \end{bmatrix}}_{A} \underbrace{\begin{bmatrix} \vec q_{e,k} \\ \Omega_{e,k} \end{bmatrix}}_{x_k} + \underbrace{\begin{bmatrix} \frac{\Delta t^2}{4J_{xx}} \\ \frac{\Delta t}{J_{xx}} \end{bmatrix}}_{B} u_k
+\underbrace{\begin{bmatrix} \vec q_{e,k+1} \\[6pt] \Omega_{e,k+1} \end{bmatrix}}_{x_{k+1}} = \underbrace{\begin{bmatrix} 1 & \dfrac{\Delta t}{2} \\[12pt] 0 & 1 \end{bmatrix}}_{A}\, \underbrace{\begin{bmatrix} \vec q_{e,k} \\[6pt] \Omega_{e,k} \end{bmatrix}}_{x_k} \;+\; \underbrace{\begin{bmatrix} \dfrac{\Delta t^2}{4J_{xx}} \\[12pt] \dfrac{\Delta t}{J_{xx}} \end{bmatrix}}_{B} u_k
 ```
 
 $A$ is a discrete double integrator (torque changes the rate, and the rate changes the
@@ -569,7 +610,10 @@ T_k = f_{1,k} + f_{2,k} + f_{3,k} + f_{4,k}
 ```
 
 ```math
-u_k^x = l\,(f_{2,k} - f_{4,k}), \qquad u_k^y = l\,(f_{3,k} - f_{1,k})
+\begin{aligned}
+u_k^x &= l\,(f_{2,k} - f_{4,k}) \\[8pt]
+u_k^y &= l\,(f_{3,k} - f_{1,k})
+\end{aligned}
 ```
 
 Only the left and right motors produce roll torque, and only the front and back motors
@@ -591,24 +635,30 @@ At hover, equal thrusts make the CW and CCW reactions cancel, so the drone does 
 **Allocation matrix.** Collecting the four equations:
 
 ```math
-\begin{bmatrix} T_k \\ u_k^x \\ u_k^y \\ u_k^z \end{bmatrix} = \underbrace{\begin{bmatrix} 1 & 1 & 1 & 1 \\ 0 & l & 0 & -l \\ -l & 0 & l & 0 \\ -c & c & -c & c \end{bmatrix}}_{M} \begin{bmatrix} f_{1,k} \\ f_{2,k} \\ f_{3,k} \\ f_{4,k} \end{bmatrix}
+\begin{bmatrix} T_k \\[6pt] u_k^x \\[6pt] u_k^y \\[6pt] u_k^z \end{bmatrix} = \underbrace{\begin{bmatrix} 1 & 1 & 1 & 1 \\[6pt] 0 & l & 0 & -l \\[6pt] -l & 0 & l & 0 \\[6pt] -c & c & -c & c \end{bmatrix}}_{M} \begin{bmatrix} f_{1,k} \\[6pt] f_{2,k} \\[6pt] f_{3,k} \\[6pt] f_{4,k} \end{bmatrix}
 ```
 
 **Mixer.** The controllers know $T_k$ and $u_k$, so the motor thrusts are obtained by
 inverting $M$:
 
 ```math
-\begin{bmatrix} f_{1,k} \\ f_{2,k} \\ f_{3,k} \\ f_{4,k} \end{bmatrix} = M^{-1} \begin{bmatrix} T_k \\ u_k^x \\ u_k^y \\ u_k^z \end{bmatrix}, \qquad M^{-1} = \begin{bmatrix} \frac{1}{4} & 0 & -\frac{1}{2l} & -\frac{1}{4c} \\ \frac{1}{4} & \frac{1}{2l} & 0 & \frac{1}{4c} \\ \frac{1}{4} & 0 & \frac{1}{2l} & -\frac{1}{4c} \\ \frac{1}{4} & -\frac{1}{2l} & 0 & \frac{1}{4c} \end{bmatrix}
+\begin{bmatrix} f_{1,k} \\[6pt] f_{2,k} \\[6pt] f_{3,k} \\[6pt] f_{4,k} \end{bmatrix} = M^{-1} \begin{bmatrix} T_k \\[6pt] u_k^x \\[6pt] u_k^y \\[6pt] u_k^z \end{bmatrix}
+```
+
+where
+
+```math
+M^{-1} = \begin{bmatrix} \dfrac{1}{4} & 0 & -\dfrac{1}{2l} & -\dfrac{1}{4c} \\[12pt] \dfrac{1}{4} & \dfrac{1}{2l} & 0 & \dfrac{1}{4c} \\[12pt] \dfrac{1}{4} & 0 & \dfrac{1}{2l} & -\dfrac{1}{4c} \\[12pt] \dfrac{1}{4} & -\dfrac{1}{2l} & 0 & \dfrac{1}{4c} \end{bmatrix}
 ```
 
 Written out per motor:
 
 ```math
 \begin{aligned}
-f_{1,k} &= \frac{T_k}{4} - \frac{u_k^y}{2l} - \frac{u_k^z}{4c} \\
-f_{2,k} &= \frac{T_k}{4} + \frac{u_k^x}{2l} + \frac{u_k^z}{4c} \\
-f_{3,k} &= \frac{T_k}{4} + \frac{u_k^y}{2l} - \frac{u_k^z}{4c} \\
-f_{4,k} &= \frac{T_k}{4} - \frac{u_k^x}{2l} + \frac{u_k^z}{4c}
+f_{1,k} &= \dfrac{T_k}{4} - \dfrac{u_k^y}{2l} - \dfrac{u_k^z}{4c} \\[12pt]
+f_{2,k} &= \dfrac{T_k}{4} + \dfrac{u_k^x}{2l} + \dfrac{u_k^z}{4c} \\[12pt]
+f_{3,k} &= \dfrac{T_k}{4} + \dfrac{u_k^y}{2l} - \dfrac{u_k^z}{4c} \\[12pt]
+f_{4,k} &= \dfrac{T_k}{4} - \dfrac{u_k^x}{2l} + \dfrac{u_k^z}{4c}
 \end{aligned}
 ```
 
@@ -620,7 +670,7 @@ torques. Each $f_{i,k}$ is then saturated to the motor range $[f_{\min}, f_{\max
 torque actually applied are recovered from the clipped values:
 
 ```math
-\begin{bmatrix} T_k^{app} \\ u_k^{app} \end{bmatrix} = M\, f_k^{clipped}
+\begin{bmatrix} T_k^{app} \\[6pt] u_k^{app} \end{bmatrix} = M\, f_k^{clipped}
 ```
 
 ### 7. Black-Box System Identification
@@ -640,13 +690,17 @@ The state and input for each loop are:
 **Regression form.** Gathering the unknowns into $\Theta = [\,A \;\; B\,]$:
 
 ```math
-x_{k+1} = \begin{bmatrix} A & B \end{bmatrix} \begin{bmatrix} x_k \\ u_k \end{bmatrix} = \Theta \begin{bmatrix} x_k \\ u_k \end{bmatrix}
+x_{k+1} = \begin{bmatrix} A & B \end{bmatrix} \begin{bmatrix} x_k \\[6pt] u_k \end{bmatrix} = \Theta \begin{bmatrix} x_k \\[6pt] u_k \end{bmatrix}
 ```
 
 Stacking $N$ logged samples column-wise:
 
 ```math
-\underbrace{\begin{bmatrix} x_1 & x_2 & \cdots & x_N \end{bmatrix}}_{X'} = \underbrace{\begin{bmatrix} A & B \end{bmatrix}}_{\Theta} \underbrace{\begin{bmatrix} x_0 & x_1 & \cdots & x_{N-1} \\ u_0 & u_1 & \cdots & u_{N-1} \end{bmatrix}}_{Z}, \qquad X' = \Theta Z
+\underbrace{\begin{bmatrix} x_1 & x_2 & \cdots & x_N \end{bmatrix}}_{X'} = \underbrace{\begin{bmatrix} A & B \end{bmatrix}}_{\Theta} \underbrace{\begin{bmatrix} x_0 & x_1 & \cdots & x_{N-1} \\[6pt] u_0 & u_1 & \cdots & u_{N-1} \end{bmatrix}}_{Z}
+```
+
+```math
+X' = \Theta Z
 ```
 
 **Least-squares solution.** $\Theta$ is found by minimising the prediction error:
@@ -658,7 +712,11 @@ Stacking $N$ logged samples column-wise:
 Setting the gradient to zero:
 
 ```math
-2\,\Theta Z Z^\top - 2\,X' Z^\top = 0 \;\;\Rightarrow\;\; \Theta Z Z^\top = X' Z^\top \;\;\Rightarrow\;\; \Theta = X' Z^\top \left( Z Z^\top \right)^{-1} = X' Z^{+}
+\begin{aligned}
+& 2\,\Theta Z Z^\top - 2\,X' Z^\top = 0 \\[8pt]
+\Rightarrow\quad & \Theta Z Z^\top = X' Z^\top \\[8pt]
+\Rightarrow\quad & \Theta = X' Z^\top \left( Z Z^\top \right)^{-1} = X' Z^{+}
+\end{aligned}
 ```
 
 where $Z^{+}$ is the pseudo-inverse. $\hat A$ is the first two columns of $\Theta$ and
@@ -669,7 +727,10 @@ rank, so all rows of $Z$ must be linearly independent. In normal closed-loop fli
 input is a fixed combination of the state,
 
 ```math
-u_k = -K_{p,att}\,\vec q_{e,k} - K_{d,att}\,\Omega_{e,k} = -K x_k \qquad \left( \text{position loop: } u_k = K_p\, e_{pos,k} + K_d\, e_{vel,k} \right)
+\begin{aligned}
+\text{attitude loop:}\quad u_k &= -K_{p,att}\,\vec q_{e,k} - K_{d,att}\,\Omega_{e,k} = -K x_k \\[8pt]
+\text{position loop:}\quad u_k &= K_p\, e_{pos,k} + K_d\, e_{vel,k}
+\end{aligned}
 ```
 
 so the input row of $Z$ depends on the other two rows and $ZZ^\top$ is not invertible.
@@ -690,7 +751,7 @@ example $x^9 + x^5 + 1$), the sequence has the maximal period $N = 2^n - 1$, is 
 (nearly zero mean), and has an almost ideal autocorrelation:
 
 ```math
-R(k) = \sum_j d_j\, d_{j+k} = \begin{cases} N a^2 & k = 0 \\ -a^2 & k \neq 0 \end{cases}
+R(k) = \sum_j d_j\, d_{j+k} = \begin{cases} N a^2 & k = 0 \\[6pt] -a^2 & k \neq 0 \end{cases}
 ```
 
 so it behaves like bounded white noise. Each bit is held for a clock period $T_c$, which
@@ -754,7 +815,7 @@ system recovers to sub-half-meter tracking within the following segment.
 
 **Animation — Stage 4 flight, top-down (planned path vs. flown path):**
 
-![Stage 2 trajectory animation](assets/results/stage2_trajectory_tracking.png)
+![Stage 4 trajectory animation](assets/results/stage4_trajectory_tracking.gif)
 
 The animation shows the drone (blue) departing from the naive planned route (gray
 dashed) as `ReactiveReplanner` perturbs the remaining control points around the two

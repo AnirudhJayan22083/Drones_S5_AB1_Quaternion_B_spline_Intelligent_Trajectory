@@ -755,7 +755,7 @@ system recovers to sub-half-meter tracking within the following segment.
 
 **Animation — Stage 4 flight, top-down (planned path vs. flown path):**
 
-![Stage 4 trajectory animation](assets/results/stage4_trajectory_tracking.gif)
+![Stage 2 trajectory animation](assets/results/stage2_trajectory_tracking.png)
 
 The animation shows the drone (blue) departing from the naive planned route (gray
 dashed) as `ReactiveReplanner` perturbs the remaining control points around the two
